@@ -96,6 +96,8 @@ model Course {
   categoryId       String
   teacherId        String
   referenceVideoId String?           @unique
+  coverImageKey    String?           @unique
+  coverUpdatedAt   DateTime?
   title            String
   slug             String            @unique
   description      String

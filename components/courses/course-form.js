@@ -5,6 +5,8 @@ import { createCourse, updateCourse } from "@/features/courses/actions";
 import { Field, inputClass, textareaClass } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { SubmitButton, StateToast } from "@/components/form-feedback";
+import { CoverEditor } from "@/components/courses/cover-editor";
+import { getCourseCoverUrl } from "@/lib/image/url";
 
 export function CourseForm({ course, categories, teachers, isAdmin }) {
   const action = course ? updateCourse : createCourse; const [state, formAction] = useActionState(action, null);
@@ -20,6 +22,7 @@ export function CourseForm({ course, categories, teachers, isAdmin }) {
       <Button type="button" variant="outline" className="justify-self-start" onClick={() => setCriteria((items) => [...items, { title: "", description: "", weight: 0 }])}><Plus size={17} /> Tambah kriteria</Button>
     </div>
     <Field label="Nilai minimal lulus" className="max-w-xs"><input name="passThreshold" type="number" min="1" max="100" className={inputClass} defaultValue={course?.passThreshold || 75} required /></Field>
+    {course ? <section className="grid gap-3 border-t border-slate-200 pt-6"><div><h3 className="font-bold text-slate-900">Cover course</h3><p className="text-xs text-slate-500">Atur gambar yang tampil di katalog dan halaman materi.</p></div><CoverEditor courseId={course.id} coverUrl={getCourseCoverUrl(course)} /></section> : null}
     <SubmitButton className="justify-self-start" pendingLabel={course ? "Menyimpan perubahan…" : "Membuat course…"} disabled={total !== 100}>{course ? "Simpan perubahan" : "Buat course"}</SubmitButton>
   </form>;
 }

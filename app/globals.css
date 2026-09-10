@@ -24,6 +24,30 @@ body {
 button, input, textarea, select { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
 a { text-decoration: none; }
+button:not(:disabled), a[href], [role="button"] { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+button:not(:disabled) { transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, filter 150ms ease, transform 150ms ease; }
+button:not(:disabled):hover { filter: brightness(.96); }
+button:not(:disabled):active { transform: scale(.98); }
+a[href][class*="bg-cyan-"], a[href][class*="border-slate-"] { transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease; }
+a[href][class*="bg-cyan-"]:hover, a[href][class*="border-slate-"]:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgb(15 23 42 / .12); }
+a[href][class*="bg-cyan-"]:active, a[href][class*="border-slate-"]:active { transform: scale(.98); }
+a[href][class*="text-cyan-"]:hover { color: #0891b2; text-decoration: underline; text-underline-offset: 3px; }
+a[href]:focus-visible { outline: 2px solid #06b6d4; outline-offset: 3px; }
+
+.action-link {
+  transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+.action-link:hover { transform: translateY(-1px); }
+.action-link:active { transform: translateY(0) scale(.98); }
+.text-action { transition: color 150ms ease, text-decoration-color 150ms ease; text-underline-offset: 3px; }
+.text-action:hover { color: #0891b2; text-decoration: underline; }
+.text-action:focus-visible, .action-link:focus-visible { outline: 2px solid #06b6d4; outline-offset: 3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .action-link, .text-action { transition: none; }
+  .action-link:hover, .action-link:active { transform: none; }
+}
 
 .nav-link {
   display: flex;

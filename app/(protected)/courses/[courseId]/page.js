@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { notFound, redirect } from "next/navigation";
 import { BookOpen, CheckCircle2, ClipboardCheck, Scissors, UploadCloud, UserRound } from "lucide-react";
 import { requireUser, canManageCourse } from "@/lib/auth/dal";
@@ -13,6 +14,7 @@ import { TrimEditor } from "@/components/video/trim-editor";
 import { StudentFeedback } from "@/components/reviews/student-feedback";
 import { submitAttempt } from "@/features/submissions/actions";
 import { formatDate } from "@/lib/utils";
+import { getCourseCoverUrl } from "@/lib/image/url";
 
 export default async function CourseDetailPage({ params }) {
   const user = await requireUser(); const { courseId } = await params;
@@ -24,8 +26,9 @@ export default async function CourseDetailPage({ params }) {
     await db.enrollment.upsert({ where: { courseId_studentId: { courseId, studentId: user.id } }, create: { courseId, studentId: user.id }, update: { lastOpenedAt: new Date() } });
     submissions = await db.submission.findMany({ where: { courseId, studentId: user.id }, include: { activeVideo: true, originalVideo: true, review: { include: { scores: true, comments: { orderBy: { timestampSeconds: "asc" } } } } }, orderBy: { attemptNumber: "desc" } });
   }
-  const active = submissions.find((item) => item.status === "DRAFT") || submissions[0]; const canPractice = user.role === "STUDENT" && course.referenceVideo?.status === "READY";
+  const active = submissions.find((item) => item.status === "DRAFT") || submissions[0]; const canPractice = user.role === "STUDENT" && course.referenceVideo?.status === "READY"; const coverUrl = getCourseCoverUrl(course);
   return <><PageHeader eyebrow={`${course.category.name} · ${course.status}`} title={course.title} description={course.description} actions={canManageCourse(user, course) ? <Link href={`/teacher/courses/${course.id}/edit`} className="inline-flex h-11 items-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold">Kelola course</Link> : null} />
+    {coverUrl ? <div className="relative mb-5 h-44 overflow-hidden rounded-2xl bg-slate-900 shadow-sm md:h-64"><Image src={coverUrl} alt={`Cover ${course.title}`} fill sizes="100vw" className="object-cover" priority unoptimized /><div className="absolute inset-0 bg-gradient-to-t from-slate-950/35 to-transparent" /></div> : null}
     <div className="mb-5 flex flex-wrap gap-2"><Badge tone="info"><UserRound size={13} className="mr-1" /> {course.teacher.name}</Badge><Badge tone="neutral"><BookOpen size={13} className="mr-1" /> {course.rubricCriteria.length} kriteria</Badge><Badge tone="success">Nilai lulus {course.passThreshold}</Badge></div>
     {course.referenceVideo?.status === "READY" ? <SynchronizedPlayer referenceAssetId={course.referenceVideo.id} studentAssetId={active?.activeVideoId} courseId={course.id} trackProgress={user.role === "STUDENT"} /> : <Card><CardContent className="py-12 text-center text-slate-500">Video referensi belum tersedia.</CardContent></Card>}
     {canPractice ? <div className="mt-7 grid gap-6 xl:grid-cols-[1.2fr_0.8fr]"><div className="grid content-start gap-6">{active?.status === "DRAFT" ? <Card><CardHeader><div className="flex items-center gap-3"><span className="grid size-10 place-items-center rounded-xl bg-cyan-50 text-cyan-700"><Scissors size={20}/></span><div><h2 className="font-bold">Trim video attempt {active.attemptNumber}</h2><p className="text-xs text-slate-500">Original tetap tersimpan; hasil menjadi versi aktif.</p></div></div></CardHeader><CardContent><TrimEditor courseId={course.id} submissionId={active.id} sourceAssetId={active.activeVideoId} durationSeconds={active.activeVideo.durationSeconds} sourceSizeBytes={active.activeVideo.sizeBytes} /></CardContent></Card> : null}{active?.review ? <StudentFeedback review={active.review} threshold={course.passThreshold} /> : null}</div>

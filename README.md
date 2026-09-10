@@ -9,6 +9,7 @@ LMS video untuk pembelajaran gerakan olahraga. Student dapat membandingkan video
 - JWT `HttpOnly` cookie dengan authorization berbasis role dan `authVersion`
 - MinIO private bucket dengan multipart presigned upload dan playback URL
 - ffmpeg.wasm untuk trim client-side
+- react-easy-crop dan Canvas untuk cover course 16:9
 - Vitest dan Playwright
 
 ## Menjalankan secara lokal
@@ -73,7 +74,7 @@ Admin membuat seluruh akun tambahan; tidak ada registrasi publik.
 
 1. Admin membuat category dan akun teacher/student.
 2. Teacher membuat course dan rubric dengan total bobot 100%.
-3. Teacher mengupload reference video MP4, lalu menerbitkan course.
+3. Teacher dapat mengatur cover course, mengupload reference video MP4, lalu menerbitkan course.
 4. Student membuka course, mengupload video latihan, membandingkan kedua video, dan dapat menyimpan hasil trim sebagai versi baru.
 5. Student mengirim draft sebagai submission yang immutable.
 6. Teacher memberi skor per kriteria, keputusan lulus/revisi, feedback umum, dan komentar bertimestamp.
@@ -88,6 +89,13 @@ Admin membuat seluruh akun tambahan; tidak ada registrasi publik.
 - Original student tidak ditimpa saat membuat hasil trim
 - Editing di atas 200 MB bersifat best-effort dan ditargetkan ke Chrome/Edge desktop
 - Mode sinkron menggunakan timeline video terpendek dan koreksi drift 120 ms
+
+## Kebijakan cover course
+
+- Sumber berupa JPG, PNG, atau WebP maksimal 5 MB dan 20 megapiksel
+- Teacher/admin melakukan crop manual 16:9; browser menghasilkan WebP 1280×720 maksimal 2 MB
+- Upload menggunakan presigned PUT ke `${MINIO_FOLDER}/covers/...`
+- Cover bersifat opsional, dapat diganti/dihapus, dan object lama dibersihkan dari MinIO
 
 ## Struktur kode
 

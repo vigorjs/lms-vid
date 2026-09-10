@@ -9,5 +9,5 @@ const variants = {
 };
 
 export function Button({ className, variant = "primary", size = "md", ...props }) {
-  return <button className={cn("inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500", size === "sm" ? "h-9 px-3 text-sm" : "h-11 px-4 text-sm", variants[variant], className)} {...props} />;
+  return <button className={cn("inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl font-semibold transition duration-150 motion-safe:hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2", size === "sm" ? "h-9 px-3 text-sm" : "h-11 px-4 text-sm", variants[variant], className)} {...props} />;
 }
