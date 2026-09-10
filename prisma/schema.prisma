@@ -167,6 +167,8 @@ model VideoAsset {
   kind                 VideoKind
   status               VideoStatus  @default(UPLOADING)
   objectKey            String       @unique
+  multipartUploadId    String?      @unique
+  multipartPartSize    Int?
   originalName         String
   contentType          String
   sizeBytes            Int

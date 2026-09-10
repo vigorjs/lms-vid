@@ -7,7 +7,7 @@ LMS video untuk pembelajaran gerakan olahraga. Student dapat membandingkan video
 - Next.js 16 App Router, React 19, JavaScript/JSX, Tailwind CSS 4
 - PostgreSQL + Prisma ORM 7
 - JWT `HttpOnly` cookie dengan authorization berbasis role dan `authVersion`
-- MinIO private bucket dengan presigned upload/playback URL
+- MinIO private bucket dengan multipart presigned upload dan playback URL
 - ffmpeg.wasm untuk trim client-side
 - Vitest dan Playwright
 
@@ -82,7 +82,8 @@ Admin membuat seluruh akun tambahan; tidak ada registrasi publik.
 ## Kebijakan video
 
 - MP4 dengan codec H.264/AAC
-- Maksimum 500 MB dan 10 menit
+- Maksimum 100 MB dan 10 menit
+- Upload menggunakan part 5 MiB secara berurutan dengan tiga percobaan per part agar lebih tahan terhadap timeout proxy
 - Object disimpan privat di MinIO; database hanya menyimpan metadata/object key
 - Original student tidak ditimpa saat membuat hasil trim
 - Editing di atas 200 MB bersifat best-effort dan ditargetkan ke Chrome/Edge desktop
@@ -116,5 +117,6 @@ E2E membutuhkan PostgreSQL yang sudah dimigrasi/seed dan MinIO yang aktif.
 - JWT berlaku 8 jam dan disimpan di cookie `HttpOnly`, `SameSite=Lax`, serta `Secure` pada production.
 - Perubahan password, role, atau status menaikkan `authVersion` dan membatalkan JWT lama.
 - `proxy.js` hanya melakukan redirect awal; semua akses data dan mutasi mengulang authorization di DAL/action.
-- Mutasi upload memeriksa origin, role, ownership, ukuran, metadata, dan object MinIO setelah upload.
+- Mutasi upload memeriksa origin, role, ownership, ukuran, metadata, kelengkapan setiap part, dan object MinIO setelah completion.
+- Upload yang dibatalkan atau gagal setelah tiga percobaan akan menghapus sesi multipart dan menandai asset sebagai `FAILED`.
 - Bucket MinIO tidak bersifat public; playback menggunakan URL bertanda tangan satu jam.
