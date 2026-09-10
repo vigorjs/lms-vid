@@ -47,6 +47,16 @@ Prasyarat: Node.js 20.20+, PostgreSQL yang berjalan di `localhost:5432`, dan Doc
 
    Buka `http://localhost:3000`.
 
+## Deployment Vercel dengan Supabase
+
+Gunakan dua koneksi terpisah:
+
+- `DATABASE_URL`: Supavisor Transaction Pooler port `6543` untuk traffic runtime Vercel. Tambahkan `pgbouncer=true`, `connection_limit=1`, `sslmode=require`, dan `uselibpqcompat=true`.
+- `DIRECT_URL`: Direct connection port `5432`, atau Session Pooler port `5432` bila mesin migration tidak memiliki IPv6. URL ini hanya digunakan Prisma CLI.
+- `DATABASE_POOL_MAX=1`: membatasi setiap instance serverless ke satu koneksi database.
+
+Setelah mengubah environment variable di Vercel, lakukan redeploy karena deployment lama tidak mengambil nilai yang baru.
+
 ## Akun demo
 
 Password default mengikuti `DEMO_PASSWORD` dan bernilai `Demo123!` bila tidak diubah.
