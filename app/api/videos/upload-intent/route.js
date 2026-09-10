@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
 import { authorize, canManageCourse } from "@/lib/auth/dal";
 import { uploadIntentSchema } from "@/lib/validation";
-import { createPresignedUpload } from "@/lib/storage/minio";
+import { createPresignedUpload, createVideoObjectKey } from "@/lib/storage/minio";
 import { AppError, errorResponse } from "@/lib/errors";
 
 function assertSameOrigin(request) {
@@ -27,7 +27,7 @@ export async function POST(request) {
         if (!parent || !submission || input.trimStartSeconds >= input.trimEndSeconds || input.trimEndSeconds > input.durationSeconds) throw new AppError("Data hasil trim tidak valid.", 400, "INVALID_TRIM"); kind = "STUDENT_EDIT";
       }
     }
-    const objectKey = `${kind === "REFERENCE" ? "references" : "submissions"}/${course.id}/${user.id}/${randomUUID()}.mp4`;
+    const objectKey = createVideoObjectKey(kind === "REFERENCE" ? "references" : "submissions", course.id, user.id, `${randomUUID()}.mp4`);
     const asset = await db.videoAsset.create({ data: { ownerId: user.id, courseId: course.id, parentAssetId: parent?.id, kind, objectKey, originalName: input.fileName, contentType: input.contentType, sizeBytes: input.sizeBytes, durationSeconds: input.durationSeconds, codec: "H.264/AAC", trimStartSeconds: input.trimStartSeconds, trimEndSeconds: input.trimEndSeconds } });
     const upload = await createPresignedUpload({ objectKey, maxSize: input.sizeBytes });
     return Response.json({ data: { assetId: asset.id, upload } });
