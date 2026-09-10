@@ -1,6 +1,5 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { authorize, canManageCourse } from "@/lib/auth/dal";
 import { courseSchema } from "@/lib/validation";
@@ -24,8 +23,8 @@ export async function createCourse(_state, formData) {
     if (!teacherId) throw new Error("Teacher wajib dipilih.");
     const teacher = await db.user.findFirst({ where: { id: teacherId, role: "TEACHER", status: "ACTIVE" } }); if (!teacher) throw new Error("Teacher tidak valid.");
     const course = await db.course.create({ data: { title: values.title, slug: await uniqueSlug(values.title), description: values.description, categoryId: values.categoryId, teacherId, passThreshold: values.passThreshold, rubricCriteria: { create: values.criteria.map((item, sortOrder) => ({ ...item, sortOrder })) } } });
-    redirect(`/teacher/courses/${course.id}/edit`);
-  } catch (error) { if (error?.digest?.startsWith("NEXT_REDIRECT")) throw error; return { ok: false, message: error.message || "Gagal membuat course." }; }
+    return { ok: true, message: "Course berhasil dibuat.", redirectTo: `/teacher/courses/${course.id}/edit` };
+  } catch (error) { return { ok: false, message: error.message || "Gagal membuat course." }; }
 }
 export async function updateCourse(_state, formData) {
   try {
@@ -38,12 +37,25 @@ export async function updateCourse(_state, formData) {
     revalidatePath(`/teacher/courses/${id}/edit`); return { ok: true, message: "Course berhasil diperbarui." };
   } catch (error) { return { ok: false, message: error.message || "Gagal memperbarui course." }; }
 }
-export async function publishCourse(formData) {
-  const actor = await authorize(["ADMIN", "TEACHER"]); const id = String(formData.get("id")); const course = await db.course.findUniqueOrThrow({ where: { id }, include: { referenceVideo: true, rubricCriteria: true, category: true } });
-  if (!canManageCourse(actor, course)) return; if (!course.category.isActive || course.referenceVideo?.status !== "READY" || !course.rubricCriteria.length || course.rubricCriteria.reduce((sum, item) => sum + item.weight, 0) !== 100) return;
-  await db.course.update({ where: { id }, data: { status: "PUBLISHED", archivedAt: null } }); revalidatePath("/courses"); revalidatePath(`/teacher/courses/${id}/edit`);
+export async function publishCourse(_state, formData) {
+  try {
+    const actor = await authorize(["ADMIN", "TEACHER"]); const id = String(formData.get("id")); const course = await db.course.findUniqueOrThrow({ where: { id }, include: { referenceVideo: true, rubricCriteria: true, category: true } });
+    if (!canManageCourse(actor, course)) throw new Error("Anda tidak diizinkan mengelola course ini.");
+    if (!course.category.isActive) throw new Error("Aktifkan kategori course terlebih dahulu.");
+    if (course.referenceVideo?.status !== "READY") throw new Error("Reference video harus siap sebelum course diterbitkan.");
+    if (!course.rubricCriteria.length || course.rubricCriteria.reduce((sum, item) => sum + item.weight, 0) !== 100) throw new Error("Total bobot rubric harus tepat 100%.");
+    await db.course.update({ where: { id }, data: { status: "PUBLISHED", archivedAt: null } }); revalidatePath("/courses"); revalidatePath(`/teacher/courses/${id}/edit`);
+    return { ok: true, message: "Course berhasil diterbitkan." };
+  } catch (error) {
+    return { ok: false, message: error.message || "Gagal menerbitkan course." };
+  }
 }
-export async function archiveCourse(formData) {
-  const actor = await authorize(["ADMIN", "TEACHER"]); const id = String(formData.get("id")); const course = await db.course.findUniqueOrThrow({ where: { id } }); if (!canManageCourse(actor, course)) return;
-  await db.course.update({ where: { id }, data: { status: "ARCHIVED", archivedAt: new Date() } }); revalidatePath("/courses"); revalidatePath("/teacher/courses");
+export async function archiveCourse(_state, formData) {
+  try {
+    const actor = await authorize(["ADMIN", "TEACHER"]); const id = String(formData.get("id")); const course = await db.course.findUniqueOrThrow({ where: { id } }); if (!canManageCourse(actor, course)) throw new Error("Anda tidak diizinkan mengelola course ini.");
+    await db.course.update({ where: { id }, data: { status: "ARCHIVED", archivedAt: new Date() } }); revalidatePath("/courses"); revalidatePath("/teacher/courses"); revalidatePath(`/teacher/courses/${id}/edit`);
+    return { ok: true, message: "Course berhasil diarsipkan." };
+  } catch (error) {
+    return { ok: false, message: error.message || "Gagal mengarsipkan course." };
+  }
 }

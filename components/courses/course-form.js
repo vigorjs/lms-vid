@@ -20,6 +20,6 @@ export function CourseForm({ course, categories, teachers, isAdmin }) {
       <Button type="button" variant="outline" className="justify-self-start" onClick={() => setCriteria((items) => [...items, { title: "", description: "", weight: 0 }])}><Plus size={17} /> Tambah kriteria</Button>
     </div>
     <Field label="Nilai minimal lulus" className="max-w-xs"><input name="passThreshold" type="number" min="1" max="100" className={inputClass} defaultValue={course?.passThreshold || 75} required /></Field>
-    <SubmitButton className="justify-self-start" disabled={total !== 100}>{course ? "Simpan perubahan" : "Buat course"}</SubmitButton>
+    <SubmitButton className="justify-self-start" pendingLabel={course ? "Menyimpan perubahan…" : "Membuat course…"} disabled={total !== 100}>{course ? "Simpan perubahan" : "Buat course"}</SubmitButton>
   </form>;
 }
