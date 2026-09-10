@@ -1,0 +1,261 @@
+generator client {
+  provider            = "prisma-client"
+  output              = "../generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "ts"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  TEACHER
+  STUDENT
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum CourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum VideoKind {
+  REFERENCE
+  STUDENT_ORIGINAL
+  STUDENT_EDIT
+}
+
+enum VideoStatus {
+  UPLOADING
+  READY
+  FAILED
+  DELETED
+}
+
+enum SubmissionStatus {
+  DRAFT
+  SUBMITTED
+  REVIEWED
+}
+
+enum ReviewStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum ReviewOutcome {
+  PASSED
+  REVISION_REQUIRED
+}
+
+model User {
+  id                 String             @id @default(cuid())
+  name               String
+  email              String             @unique
+  passwordHash       String
+  role               Role               @default(STUDENT)
+  status             UserStatus         @default(ACTIVE)
+  authVersion        Int                @default(1)
+  failedLoginCount   Int                @default(0)
+  lockedUntil        DateTime?
+  mustChangePassword Boolean            @default(false)
+  lastLoginAt        DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  courses            Course[]           @relation("CourseTeacher")
+  videos             VideoAsset[]
+  enrollments        Enrollment[]
+  progress           WatchProgress[]
+  submissions        Submission[]       @relation("StudentSubmissions")
+  reviews            Review[]           @relation("TeacherReviews")
+  timestampFeedbacks TimestampFeedback[]
+
+  @@index([role, status])
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  courses     Course[]
+}
+
+model Course {
+  id               String            @id @default(cuid())
+  categoryId       String
+  teacherId        String
+  referenceVideoId String?           @unique
+  title            String
+  slug             String            @unique
+  description      String
+  status           CourseStatus      @default(DRAFT)
+  passThreshold    Int               @default(75)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  archivedAt       DateTime?
+  category         Category          @relation(fields: [categoryId], references: [id])
+  teacher          User              @relation("CourseTeacher", fields: [teacherId], references: [id])
+  referenceVideo   VideoAsset?       @relation("CurrentCourseReference", fields: [referenceVideoId], references: [id])
+  rubricCriteria   RubricCriterion[]
+  videos           VideoAsset[]      @relation("CourseVideos")
+  enrollments      Enrollment[]
+  progress         WatchProgress[]
+  submissions      Submission[]
+
+  @@index([categoryId, status])
+  @@index([teacherId, status])
+}
+
+model RubricCriterion {
+  id          String   @id @default(cuid())
+  courseId    String
+  title       String
+  description String?
+  weight      Int
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([courseId, sortOrder])
+}
+
+model Enrollment {
+  id           String   @id @default(cuid())
+  courseId     String
+  studentId    String
+  firstOpenedAt DateTime @default(now())
+  lastOpenedAt DateTime @default(now())
+  completedAt  DateTime?
+  course       Course   @relation(fields: [courseId], references: [id])
+  student      User     @relation(fields: [studentId], references: [id])
+
+  @@unique([courseId, studentId])
+  @@index([studentId, lastOpenedAt])
+}
+
+model WatchProgress {
+  id                 String   @id @default(cuid())
+  courseId           String
+  studentId          String
+  maxPositionSeconds Float    @default(0)
+  percent            Float    @default(0)
+  updatedAt          DateTime @updatedAt
+  course             Course   @relation(fields: [courseId], references: [id])
+  student            User     @relation(fields: [studentId], references: [id])
+
+  @@unique([courseId, studentId])
+  @@index([studentId, updatedAt])
+}
+
+model VideoAsset {
+  id                   String       @id @default(cuid())
+  ownerId              String
+  courseId             String?
+  parentAssetId        String?
+  kind                 VideoKind
+  status               VideoStatus  @default(UPLOADING)
+  objectKey            String       @unique
+  originalName         String
+  contentType          String
+  sizeBytes            Int
+  durationSeconds      Float?
+  codec                String?
+  trimStartSeconds     Float?
+  trimEndSeconds       Float?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+  deletedAt            DateTime?
+  owner                User         @relation(fields: [ownerId], references: [id])
+  course               Course?      @relation("CourseVideos", fields: [courseId], references: [id])
+  parentAsset          VideoAsset?  @relation("VideoDerivatives", fields: [parentAssetId], references: [id])
+  derivatives          VideoAsset[] @relation("VideoDerivatives")
+  currentReferenceFor  Course?      @relation("CurrentCourseReference")
+  originalFor          Submission[] @relation("OriginalSubmissionVideo")
+  activeFor            Submission[] @relation("ActiveSubmissionVideo")
+  referenceSnapshotFor Submission[] @relation("SubmissionReferenceVideo")
+
+  @@index([ownerId, kind, status])
+  @@index([courseId, kind, status])
+}
+
+model Submission {
+  id                String           @id @default(cuid())
+  courseId          String
+  studentId         String
+  originalVideoId   String
+  activeVideoId     String
+  referenceVideoId  String
+  previousAttemptId String?
+  attemptNumber     Int
+  status            SubmissionStatus @default(DRAFT)
+  submittedAt       DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  course            Course           @relation(fields: [courseId], references: [id])
+  student           User             @relation("StudentSubmissions", fields: [studentId], references: [id])
+  originalVideo     VideoAsset       @relation("OriginalSubmissionVideo", fields: [originalVideoId], references: [id])
+  activeVideo       VideoAsset       @relation("ActiveSubmissionVideo", fields: [activeVideoId], references: [id])
+  referenceVideo    VideoAsset       @relation("SubmissionReferenceVideo", fields: [referenceVideoId], references: [id])
+  previousAttempt   Submission?      @relation("SubmissionRevisions", fields: [previousAttemptId], references: [id])
+  revisions         Submission[]     @relation("SubmissionRevisions")
+  review             Review?
+
+  @@unique([courseId, studentId, attemptNumber])
+  @@index([courseId, status, submittedAt])
+  @@index([studentId, courseId, createdAt])
+}
+
+model Review {
+  id              String          @id @default(cuid())
+  submissionId    String          @unique
+  reviewerId      String
+  status          ReviewStatus    @default(DRAFT)
+  outcome         ReviewOutcome?
+  generalFeedback String?
+  finalScore      Float?
+  publishedAt     DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  submission      Submission      @relation(fields: [submissionId], references: [id])
+  reviewer        User            @relation("TeacherReviews", fields: [reviewerId], references: [id])
+  scores          ReviewCriterionScore[]
+  comments        TimestampFeedback[]
+}
+
+model ReviewCriterionScore {
+  id             String  @id @default(cuid())
+  reviewId       String
+  criterionId    String?
+  criterionTitle String
+  weight         Int
+  score          Int
+  review         Review  @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewId, criterionTitle])
+}
+
+model TimestampFeedback {
+  id              String   @id @default(cuid())
+  reviewId        String
+  authorId        String
+  timestampSeconds Float
+  comment         String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  review          Review   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  author          User     @relation(fields: [authorId], references: [id])
+
+  @@index([reviewId, timestampSeconds])
+}

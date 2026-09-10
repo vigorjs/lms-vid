@@ -1,0 +1,2 @@
+import Link from "next/link";
+export default function UnauthorizedPage() { return <main className="grid min-h-screen place-items-center bg-slate-950 p-6 text-center text-white"><div><p className="text-7xl font-black text-cyan-400">403</p><h1 className="mt-3 text-2xl font-bold">Akses tidak diizinkan</h1><p className="mt-2 text-slate-400">Role akun Anda tidak memiliki izin membuka halaman ini.</p><Link className="mt-6 inline-flex rounded-xl bg-cyan-400 px-4 py-3 font-semibold text-slate-950" href="/dashboard">Kembali ke dashboard</Link></div></main>; }

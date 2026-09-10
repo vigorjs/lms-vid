@@ -17,6 +17,15 @@
 /.next/
 /out/
 
+# generated database client
+/generated/
+
+# local environment and media tooling
+/.env
+/public/ffmpeg/
+/test-results/
+/playwright-report/
+
 # production
 /build
 
