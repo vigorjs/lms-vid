@@ -8,3 +8,9 @@ export function clampSynchronizedTime(value, duration) {
 export function shouldCorrectDrift(masterTime, followerTime, tolerance = 0.12) {
   return Math.abs(Number(masterTime) - Number(followerTime)) > tolerance;
 }
+export function frameStep(currentTime, direction, duration, fps = 30) {
+  return clampSynchronizedTime(Number(currentTime) + Math.sign(direction) / fps, duration);
+}
+export function resyncTime(masterTime, referenceDuration, studentDuration) {
+  return clampSynchronizedTime(masterTime, commonDuration(referenceDuration, studentDuration));
+}
