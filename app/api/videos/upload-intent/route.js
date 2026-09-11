@@ -12,6 +12,7 @@ import { MULTIPART_PART_SIZE_BYTES } from "@/lib/video/constants";
 import { outputDuration } from "@/lib/video/edit-spec";
 import { createMultipartPlan } from "@/lib/video/multipart";
 import { AppError, errorResponse } from "@/lib/errors";
+import { courseAccessWhere } from "@/lib/courses/access";
 
 function assertSameOrigin(request) {
   const origin = request.headers.get("origin"); const expected = process.env.APP_URL || "http://localhost:3000";
@@ -19,7 +20,13 @@ function assertSameOrigin(request) {
 }
 
 async function resolveUploadContext(user, input) {
-  const course = await db.course.findUnique({ where: { id: input.courseId }, include: { referenceVideo: true } });
+  const course = await db.course.findFirst({
+    where: {
+      id: input.courseId,
+      ...(input.purpose === "REFERENCE" ? {} : courseAccessWhere(user)),
+    },
+    include: { referenceVideo: true },
+  });
   if (!course) throw new AppError("Course tidak ditemukan.", 404, "NOT_FOUND");
 
   if (input.purpose === "REFERENCE") {

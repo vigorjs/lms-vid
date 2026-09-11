@@ -9,6 +9,7 @@ import {
 import { MAX_VIDEO_BYTES } from "@/lib/video/constants";
 import { normalizeUploadedParts } from "@/lib/video/multipart";
 import { AppError, errorResponse } from "@/lib/errors";
+import { canAccessCourse } from "@/lib/courses/access";
 
 function assertSameOrigin(request) {
   const origin = request.headers.get("origin");
@@ -16,10 +17,13 @@ function assertSameOrigin(request) {
   if (origin && origin !== expected) throw new AppError("Origin request tidak diizinkan.", 403, "INVALID_ORIGIN");
 }
 
-async function findAsset(videoId, user) {
-  const asset = await db.videoAsset.findUnique({ where: { id: videoId }, include: { course: true } });
+async function findAsset(videoId, user, requireCourseAccess = true) {
+  const asset = await db.videoAsset.findUnique({ where: { id: videoId }, include: { course: { include: { category: true, assignments: { where: { studentId: user.id }, select: { studentId: true } } } } } });
   if (!asset || asset.ownerId !== user.id) throw new AppError("Upload tidak ditemukan.", 404, "NOT_FOUND");
-  if (asset.kind === "REFERENCE" && !canManageCourse(user, asset.course)) {
+  if (requireCourseAccess && user.role === "STUDENT" && !canAccessCourse(user, asset.course)) {
+    throw new AppError("Akses course telah dicabut.", 403, "COURSE_ACCESS_DENIED");
+  }
+  if (asset.kind === "REFERENCE" && (!asset.course || !canManageCourse(user, asset.course))) {
     throw new AppError("Tidak diizinkan.", 403, "FORBIDDEN");
   }
   return asset;
@@ -142,7 +146,7 @@ export async function DELETE(request, { params }) {
     assertSameOrigin(request);
     const user = await authorize();
     const { videoId } = await params;
-    const asset = await findAsset(videoId, user);
+    const asset = await findAsset(videoId, user, false);
 
     if (asset.status === "FAILED") return new Response(null, { status: 204 });
     if (asset.status !== "UPLOADING") throw new AppError("Upload yang sudah selesai tidak dapat dibatalkan.", 409, "INVALID_UPLOAD_STATUS");

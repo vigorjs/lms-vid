@@ -75,8 +75,8 @@ Admin membuat seluruh akun tambahan; tidak ada registrasi publik.
 ## Alur utama
 
 1. Admin membuat category dan akun teacher/student.
-2. Teacher membuat course dan rubric dengan total bobot 100%.
-3. Teacher dapat mengatur cover course, mengupload reference video MP4, lalu menerbitkan course.
+2. Teacher membuat course dan rubric dengan total bobot 100%, lalu memilih akses `PUBLIC` atau `ASSIGNED` untuk student tertentu.
+3. Teacher dapat mengatur cover course, mengupload reference video MP4, lalu menerbitkan course. Course `ASSIGNED` membutuhkan minimal satu student aktif sebelum dapat diterbitkan.
 4. Student membuka course, mengupload video latihan, membandingkan kedua video, dan dapat menyimpan hasil trim sebagai versi baru.
 5. Student mengirim draft sebagai submission yang immutable.
 6. Teacher memberi skor per kriteria, keputusan lulus/revisi, feedback umum, dan komentar bertimestamp.
@@ -130,3 +130,4 @@ E2E membutuhkan PostgreSQL yang sudah dimigrasi/seed dan MinIO yang aktif.
 - Mutasi upload memeriksa origin, role, ownership, ukuran, metadata, kelengkapan setiap part, dan object MinIO setelah completion.
 - Upload yang dibatalkan atau gagal setelah tiga percobaan akan menghapus sesi multipart dan menandai asset sebagai `FAILED`.
 - Bucket MinIO tidak bersifat public; playback menggunakan URL bertanda tangan satu jam.
+- Course lama tetap `PUBLIC`. Assignment terpisah dari enrollment, sehingga pencabutan akses tidak menghapus progress, attempt, submission, atau review student.

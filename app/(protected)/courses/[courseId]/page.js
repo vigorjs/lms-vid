@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { BookOpen, CheckCircle2, ClipboardCheck, Scissors, UploadCloud, UserRound } from "lucide-react";
 import { requireUser, canManageCourse } from "@/lib/auth/dal";
 import { db } from "@/lib/db";
@@ -16,12 +16,11 @@ import { StudentFeedback } from "@/components/reviews/student-feedback";
 import { submitAttempt } from "@/features/submissions/actions";
 import { formatDate } from "@/lib/utils";
 import { getCourseCoverUrl } from "@/lib/image/url";
+import { courseAccessWhere } from "@/lib/courses/access";
 
 export default async function CourseDetailPage({ params }) {
   const user = await requireUser(); const { courseId } = await params;
-  const course = await db.course.findUnique({ where: { id: courseId }, include: { category: true, teacher: true, referenceVideo: true, rubricCriteria: { orderBy: { sortOrder: "asc" } } } }); if (!course) notFound();
-  if (user.role === "STUDENT" && course.status !== "PUBLISHED") notFound();
-  if (user.role === "TEACHER" && course.status !== "PUBLISHED" && !canManageCourse(user, course)) redirect("/unauthorized");
+  const course = await db.course.findFirst({ where: { id: courseId, ...courseAccessWhere(user) }, include: { category: true, teacher: true, referenceVideo: true, rubricCriteria: { orderBy: { sortOrder: "asc" } } } }); if (!course) notFound();
   let submissions = [];
   if (user.role === "STUDENT") {
     await db.enrollment.upsert({ where: { courseId_studentId: { courseId, studentId: user.id } }, create: { courseId, studentId: user.id }, update: { lastOpenedAt: new Date() } });

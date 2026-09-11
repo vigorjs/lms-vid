@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { authorize } from "@/lib/auth/dal";
 import { removeStorageObject } from "@/lib/storage/minio";
 import { AppError, errorResponse } from "@/lib/errors";
+import { courseAccessWhere } from "@/lib/courses/access";
 
 function assertSameOrigin(request) {
   const origin = request.headers.get("origin");
@@ -15,7 +16,7 @@ export async function DELETE(request, { params }) {
     const user = await authorize(["STUDENT"]);
     const { videoId } = await params;
     const asset = await db.videoAsset.findFirst({
-      where: { id: videoId, ownerId: user.id },
+      where: { id: videoId, ownerId: user.id, course: courseAccessWhere(user) },
       include: { submission: { select: { status: true, activeVideoId: true } } },
     });
     if (!asset || asset.kind !== "STUDENT_EDIT" || asset.status !== "READY" || !asset.submission) {

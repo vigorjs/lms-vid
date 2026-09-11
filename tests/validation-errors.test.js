@@ -28,4 +28,31 @@ describe("validation error messages", () => {
       code: "VALIDATION_ERROR",
     });
   });
+
+  it("menerima konfigurasi akses assigned dan daftar student", () => {
+    const result = courseSchema.safeParse({
+      title: "Renang gaya bebas",
+      description: "Latihan koordinasi gerakan gaya bebas.",
+      categoryId: "category-1",
+      visibility: "ASSIGNED",
+      studentIds: ["student-1", "student-2"],
+      passThreshold: 75,
+      criteria: [{ title: "Teknik", description: "", weight: 100 }],
+    });
+    expect(result.success).toBe(true);
+    expect(result.data).toMatchObject({ visibility: "ASSIGNED", studentIds: ["student-1", "student-2"] });
+  });
+
+  it("menolak tipe akses course yang tidak dikenal", () => {
+    const result = courseSchema.safeParse({
+      title: "Renang gaya bebas",
+      description: "Latihan koordinasi gerakan gaya bebas.",
+      categoryId: "category-1",
+      visibility: "PRIVATE",
+      studentIds: [],
+      passThreshold: 75,
+      criteria: [{ title: "Teknik", description: "", weight: 100 }],
+    });
+    expect(result.success).toBe(false);
+  });
 });

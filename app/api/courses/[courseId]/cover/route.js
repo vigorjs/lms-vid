@@ -4,12 +4,7 @@ import { authorize, canManageCourse } from "@/lib/auth/dal";
 import { AppError, errorResponse } from "@/lib/errors";
 import { assertSameOrigin } from "@/lib/image/server";
 import { createPlaybackUrl, removeStorageObject } from "@/lib/storage/minio";
-
-function mayViewCourse(user, course) {
-  if (user.role === "ADMIN") return true;
-  if (user.role === "TEACHER") return course.status === "PUBLISHED" || course.teacherId === user.id;
-  return course.status === "PUBLISHED" && course.category.isActive;
-}
+import { courseAccessWhere } from "@/lib/courses/access";
 
 function revalidateCourse(courseId) {
   revalidatePath("/dashboard");
@@ -24,8 +19,8 @@ export async function GET(_request, { params }) {
   try {
     const user = await authorize();
     const { courseId } = await params;
-    const course = await db.course.findUnique({ where: { id: courseId }, include: { category: true } });
-    if (!course || !mayViewCourse(user, course)) throw new AppError("Cover tidak ditemukan.", 404, "NOT_FOUND");
+    const course = await db.course.findFirst({ where: { id: courseId, ...courseAccessWhere(user) } });
+    if (!course) throw new AppError("Cover tidak ditemukan.", 404, "NOT_FOUND");
     if (!course.coverImageKey) throw new AppError("Cover belum tersedia.", 404, "NOT_FOUND");
 
     const location = await createPlaybackUrl(course.coverImageKey);

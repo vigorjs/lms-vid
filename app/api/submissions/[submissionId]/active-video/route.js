@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { authorize } from "@/lib/auth/dal";
 import { idSchema } from "@/lib/validation";
 import { AppError, errorResponse } from "@/lib/errors";
+import { courseAccessWhere } from "@/lib/courses/access";
 
 function assertSameOrigin(request) {
   const origin = request.headers.get("origin");
@@ -16,7 +17,7 @@ export async function PATCH(request, { params }) {
     const { submissionId } = await params;
     const videoId = idSchema.parse((await request.json()).videoId);
     const submission = await db.submission.findFirst({
-      where: { id: submissionId, studentId: user.id, status: "DRAFT" },
+      where: { id: submissionId, studentId: user.id, status: "DRAFT", course: courseAccessWhere(user) },
       select: { id: true, activeVideoId: true },
     });
     if (!submission) throw new AppError("Draft attempt tidak ditemukan.", 404, "DRAFT_NOT_FOUND");

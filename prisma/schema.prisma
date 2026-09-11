@@ -26,6 +26,11 @@ enum CourseStatus {
   ARCHIVED
 }
 
+enum CourseVisibility {
+  PUBLIC
+  ASSIGNED
+}
+
 enum VideoKind {
   REFERENCE
   STUDENT_ORIGINAL
@@ -76,6 +81,7 @@ model User {
   submissions        Submission[]       @relation("StudentSubmissions")
   reviews            Review[]           @relation("TeacherReviews")
   timestampFeedbacks TimestampFeedback[]
+  courseAssignments  CourseAssignment[]
 
   @@index([role, status])
 }
@@ -102,6 +108,7 @@ model Course {
   slug             String            @unique
   description      String
   status           CourseStatus      @default(DRAFT)
+  visibility       CourseVisibility  @default(PUBLIC)
   passThreshold    Int               @default(75)
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
@@ -112,6 +119,7 @@ model Course {
   rubricCriteria   RubricCriterion[]
   videos           VideoAsset[]      @relation("CourseVideos")
   enrollments      Enrollment[]
+  assignments      CourseAssignment[]
   progress         WatchProgress[]
   submissions      Submission[]
 
@@ -145,6 +153,18 @@ model Enrollment {
 
   @@unique([courseId, studentId])
   @@index([studentId, lastOpenedAt])
+}
+
+model CourseAssignment {
+  id         String   @id @default(cuid())
+  courseId   String
+  studentId  String
+  assignedAt DateTime @default(now())
+  course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  student    User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, studentId])
+  @@index([studentId, courseId])
 }
 
 model WatchProgress {
