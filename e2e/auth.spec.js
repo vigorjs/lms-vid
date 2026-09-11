@@ -11,7 +11,7 @@ async function login(page, email) {
 test("admin sees administration navigation", async ({ page }) => {
   await login(page, process.env.SEED_ADMIN_EMAIL || "admin@local.test");
   await expect(page.getByRole("link", { name: "Pengguna" })).toBeVisible();
-  await expect(page.getByText("Dashboard administrator")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Dashboard administrator" })).toBeVisible();
 });
 
 test("student cannot open admin area", async ({ page }) => {

@@ -166,6 +166,8 @@ model VideoAsset {
   ownerId              String
   courseId             String?
   parentAssetId        String?
+  submissionId         String?
+  versionNumber        Int?
   kind                 VideoKind
   status               VideoStatus  @default(UPLOADING)
   objectKey            String       @unique
@@ -178,6 +180,7 @@ model VideoAsset {
   codec                String?
   trimStartSeconds     Float?
   trimEndSeconds       Float?
+  editSpec             Json?
   createdAt            DateTime     @default(now())
   updatedAt            DateTime     @updatedAt
   deletedAt            DateTime?
@@ -185,6 +188,7 @@ model VideoAsset {
   course               Course?      @relation("CourseVideos", fields: [courseId], references: [id])
   parentAsset          VideoAsset?  @relation("VideoDerivatives", fields: [parentAssetId], references: [id])
   derivatives          VideoAsset[] @relation("VideoDerivatives")
+  submission           Submission?  @relation("SubmissionVideoVersions", fields: [submissionId], references: [id])
   currentReferenceFor  Course?      @relation("CurrentCourseReference")
   originalFor          Submission[] @relation("OriginalSubmissionVideo")
   activeFor            Submission[] @relation("ActiveSubmissionVideo")
@@ -192,6 +196,8 @@ model VideoAsset {
 
   @@index([ownerId, kind, status])
   @@index([courseId, kind, status])
+  @@index([submissionId, status, createdAt])
+  @@unique([submissionId, versionNumber])
 }
 
 model Submission {
@@ -212,6 +218,7 @@ model Submission {
   originalVideo     VideoAsset       @relation("OriginalSubmissionVideo", fields: [originalVideoId], references: [id])
   activeVideo       VideoAsset       @relation("ActiveSubmissionVideo", fields: [activeVideoId], references: [id])
   referenceVideo    VideoAsset       @relation("SubmissionReferenceVideo", fields: [referenceVideoId], references: [id])
+  videoVersions     VideoAsset[]     @relation("SubmissionVideoVersions")
   previousAttempt   Submission?      @relation("SubmissionRevisions", fields: [previousAttemptId], references: [id])
   revisions         Submission[]     @relation("SubmissionRevisions")
   review             Review?

@@ -9,6 +9,7 @@ import {
   initiateMultipartUpload,
 } from "@/lib/storage/minio";
 import { MULTIPART_PART_SIZE_BYTES } from "@/lib/video/constants";
+import { outputDuration } from "@/lib/video/edit-spec";
 import { createMultipartPlan } from "@/lib/video/multipart";
 import { AppError, errorResponse } from "@/lib/errors";
 
@@ -23,7 +24,7 @@ async function resolveUploadContext(user, input) {
 
   if (input.purpose === "REFERENCE") {
     if (!canManageCourse(user, course)) throw new AppError("Tidak boleh mengubah video course ini.", 403, "FORBIDDEN");
-    return { course, kind: "REFERENCE", parent: null };
+    return { course, kind: "REFERENCE", parent: null, submission: null, editSpec: null };
   }
 
   if (user.role !== "STUDENT" || course.status !== "PUBLISHED" || !course.referenceVideoId) {
@@ -33,7 +34,7 @@ async function resolveUploadContext(user, input) {
   if (input.purpose === "STUDENT_ORIGINAL") {
     const draft = await db.submission.findFirst({ where: { courseId: course.id, studentId: user.id, status: "DRAFT" } });
     if (draft) throw new AppError("Selesaikan draft aktif sebelum membuat attempt baru.", 409, "DRAFT_EXISTS");
-    return { course, kind: "STUDENT_ORIGINAL", parent: null };
+    return { course, kind: "STUDENT_ORIGINAL", parent: null, submission: null, editSpec: null };
   }
 
   const parent = await db.videoAsset.findFirst({
@@ -42,10 +43,42 @@ async function resolveUploadContext(user, input) {
   const submission = await db.submission.findFirst({
     where: { id: input.submissionId, studentId: user.id, courseId: course.id, status: "DRAFT" },
   });
-  if (!parent || !submission || input.trimStartSeconds >= input.trimEndSeconds || input.trimEndSeconds > input.durationSeconds) {
-    throw new AppError("Data hasil trim tidak valid.", 400, "INVALID_TRIM");
+  const editSpec = input.editSpec || (input.trimStartSeconds !== undefined && input.trimEndSeconds !== undefined ? {
+    segments: [{ startSeconds: input.trimStartSeconds, endSeconds: input.trimEndSeconds }],
+    crop: null,
+    rotation: 0,
+    flipHorizontal: false,
+    flipVertical: false,
+    speed: 1,
+    volume: 1,
+    muted: false,
+  } : null);
+  const sourceDuration = parent?.durationSeconds || 0;
+  const segmentsValid = editSpec?.segments.every((segment) => segment.endSeconds <= sourceDuration + 0.01);
+  const expectedDuration = editSpec ? outputDuration(editSpec) : 0;
+  if (!parent || !submission || submission.activeVideoId !== parent.id || !editSpec || !segmentsValid || Math.abs(expectedDuration - input.durationSeconds) > 0.1) {
+    throw new AppError("Data hasil edit tidak valid.", 400, "INVALID_EDIT");
   }
-  return { course, kind: "STUDENT_EDIT", parent };
+  return { course, kind: "STUDENT_EDIT", parent, submission, editSpec };
+}
+
+async function createAsset(data, submission) {
+  if (!submission) return db.videoAsset.create({ data });
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await db.$transaction(async (tx) => {
+        const aggregate = await tx.videoAsset.aggregate({
+          where: { submissionId: submission.id },
+          _max: { versionNumber: true },
+        });
+        return tx.videoAsset.create({
+          data: { ...data, submissionId: submission.id, versionNumber: (aggregate._max.versionNumber ?? 0) + 1 },
+        });
+      });
+    } catch (error) {
+      if (error?.code !== "P2002" || attempt === 2) throw error;
+    }
+  }
 }
 
 export async function POST(request) {
@@ -57,7 +90,7 @@ export async function POST(request) {
     assertSameOrigin(request);
     const user = await authorize();
     const input = uploadIntentSchema.parse(await request.json());
-    const { course, kind, parent } = await resolveUploadContext(user, input);
+    const { course, kind, parent, submission, editSpec } = await resolveUploadContext(user, input);
     const plan = createMultipartPlan(input.sizeBytes);
 
     objectKey = createVideoObjectKey(
@@ -68,8 +101,8 @@ export async function POST(request) {
     );
     uploadId = await initiateMultipartUpload(objectKey);
 
-    const asset = await db.videoAsset.create({
-      data: {
+    const singleSegment = editSpec?.segments.length === 1 ? editSpec.segments[0] : null;
+    const asset = await createAsset({
         ownerId: user.id,
         courseId: course.id,
         parentAssetId: parent?.id,
@@ -82,10 +115,10 @@ export async function POST(request) {
         sizeBytes: input.sizeBytes,
         durationSeconds: input.durationSeconds,
         codec: "H.264/AAC",
-        trimStartSeconds: input.trimStartSeconds,
-        trimEndSeconds: input.trimEndSeconds,
-      },
-    });
+        trimStartSeconds: singleSegment?.startSeconds,
+        trimEndSeconds: singleSegment?.endSeconds,
+        ...(editSpec ? { editSpec } : {}),
+      }, submission);
     assetId = asset.id;
 
     const parts = await createMultipartPartUrls(objectKey, uploadId, plan.length);

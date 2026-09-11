@@ -46,13 +46,13 @@ async function abortVideoAsset(assetId) {
   await fetch(`/api/videos/${assetId}/complete`, { method: "DELETE", keepalive: true }).catch(() => {});
 }
 
-export async function uploadVideoAsset({ courseId, purpose, file, durationSeconds, parentAssetId, submissionId, trimStartSeconds, trimEndSeconds, onProgress, signal }) {
+export async function uploadVideoAsset({ courseId, purpose, file, durationSeconds, parentAssetId, submissionId, trimStartSeconds, trimEndSeconds, editSpec, onProgress, signal }) {
   let assetId;
   try {
     const intentResponse = await fetch("/api/videos/upload-intent", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ courseId, purpose, fileName: file.name, contentType: "video/mp4", sizeBytes: file.size, durationSeconds, parentAssetId, submissionId, trimStartSeconds, trimEndSeconds }),
+      body: JSON.stringify({ courseId, purpose, fileName: file.name, contentType: "video/mp4", sizeBytes: file.size, durationSeconds, parentAssetId, submissionId, trimStartSeconds, trimEndSeconds, editSpec }),
       signal,
     });
     const intent = await intentResponse.json();

@@ -102,6 +102,10 @@ async function finalizeAsset(asset, user, submissionId) {
           attemptNumber: (aggregate._max.attemptNumber || 0) + 1,
         },
       });
+      await tx.videoAsset.update({
+        where: { id: asset.id },
+        data: { submissionId: submission.id, versionNumber: 0 },
+      });
       return { assetId: asset.id, submissionId: submission.id };
     }
 
