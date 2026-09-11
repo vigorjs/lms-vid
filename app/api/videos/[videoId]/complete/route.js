@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { db, dbTransactionOptions } from "@/lib/db";
 import { authorize, canManageCourse } from "@/lib/auth/dal";
 import {
   abortMultipartUpload,
@@ -116,7 +116,7 @@ async function finalizeAsset(asset, user, submissionId) {
     if (!submission) throw new AppError("Draft submission tidak ditemukan.", 404, "DRAFT_NOT_FOUND");
     await tx.submission.update({ where: { id: submission.id }, data: { activeVideoId: asset.id } });
     return { assetId: asset.id, submissionId: submission.id };
-  }, { maxWait: 5_000, timeout: 15_000 });
+  }, dbTransactionOptions);
 }
 
 export async function POST(request, { params }) {

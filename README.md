@@ -55,6 +55,8 @@ Gunakan dua koneksi terpisah:
 - `DATABASE_URL`: Supavisor Transaction Pooler port `6543` untuk traffic runtime Vercel. Tambahkan `pgbouncer=true`, `connection_limit=1`, `sslmode=require`, dan `uselibpqcompat=true`.
 - `DIRECT_URL`: Direct connection port `5432`, atau Session Pooler port `5432` bila mesin migration tidak memiliki IPv6. URL ini hanya digunakan Prisma CLI.
 - `DATABASE_POOL_MAX=1`: membatasi setiap instance serverless ke satu koneksi database.
+- `DATABASE_TRANSACTION_MAX_WAIT_MS=10000`: waktu maksimum menunggu koneksi untuk transaksi.
+- `DATABASE_TRANSACTION_TIMEOUT_MS=15000`: batas transaksi Prisma, termasuk nested write dan batch transaction.
 
 Setelah mengubah environment variable di Vercel, lakukan redeploy karena deployment lama tidak mengambil nilai yang baru.
 
