@@ -91,14 +91,15 @@ async function finalizeAsset(asset, user, submissionId) {
         where: { courseId: asset.courseId, studentId: user.id },
         _max: { attemptNumber: true },
       });
-      const course = await tx.course.findUniqueOrThrow({ where: { id: asset.courseId } });
+      const referenceVideoId = asset.course.referenceVideoId;
+      if (!referenceVideoId) throw new AppError("Video referensi course tidak tersedia.", 409, "REFERENCE_NOT_FOUND");
       const submission = await tx.submission.create({
         data: {
           courseId: asset.courseId,
           studentId: user.id,
           originalVideoId: asset.id,
           activeVideoId: asset.id,
-          referenceVideoId: course.referenceVideoId,
+          referenceVideoId,
           attemptNumber: (aggregate._max.attemptNumber || 0) + 1,
         },
       });
@@ -115,7 +116,7 @@ async function finalizeAsset(asset, user, submissionId) {
     if (!submission) throw new AppError("Draft submission tidak ditemukan.", 404, "DRAFT_NOT_FOUND");
     await tx.submission.update({ where: { id: submission.id }, data: { activeVideoId: asset.id } });
     return { assetId: asset.id, submissionId: submission.id };
-  });
+  }, { maxWait: 5_000, timeout: 15_000 });
 }
 
 export async function POST(request, { params }) {

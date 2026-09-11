@@ -66,14 +66,12 @@ async function createAsset(data, submission) {
   if (!submission) return db.videoAsset.create({ data });
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      return await db.$transaction(async (tx) => {
-        const aggregate = await tx.videoAsset.aggregate({
-          where: { submissionId: submission.id },
-          _max: { versionNumber: true },
-        });
-        return tx.videoAsset.create({
-          data: { ...data, submissionId: submission.id, versionNumber: (aggregate._max.versionNumber ?? 0) + 1 },
-        });
+      const aggregate = await db.videoAsset.aggregate({
+        where: { submissionId: submission.id },
+        _max: { versionNumber: true },
+      });
+      return await db.videoAsset.create({
+        data: { ...data, submissionId: submission.id, versionNumber: (aggregate._max.versionNumber ?? 0) + 1 },
       });
     } catch (error) {
       if (error?.code !== "P2002" || attempt === 2) throw error;

@@ -30,9 +30,21 @@ export async function updateCourse(_state, formData) {
   try {
     const actor = await authorize(["ADMIN", "TEACHER"]); const id = String(formData.get("id")); const course = await db.course.findUniqueOrThrow({ where: { id } }); if (!canManageCourse(actor, course)) throw new Error("Tidak diizinkan.");
     const values = parseCourse(formData); const teacherId = actor.role === "ADMIN" ? values.teacherId : actor.id;
-    await db.$transaction(async (tx) => {
-      await tx.rubricCriterion.deleteMany({ where: { courseId: id } });
-      await tx.course.update({ where: { id }, data: { title: values.title, slug: await uniqueSlug(values.title, id), description: values.description, categoryId: values.categoryId, teacherId, passThreshold: values.passThreshold, rubricCriteria: { create: values.criteria.map((item, sortOrder) => ({ ...item, sortOrder })) } } });
+    const slug = await uniqueSlug(values.title, id);
+    await db.course.update({
+      where: { id },
+      data: {
+        title: values.title,
+        slug,
+        description: values.description,
+        categoryId: values.categoryId,
+        teacherId,
+        passThreshold: values.passThreshold,
+        rubricCriteria: {
+          deleteMany: {},
+          create: values.criteria.map((item, sortOrder) => ({ ...item, sortOrder })),
+        },
+      },
     });
     revalidatePath(`/teacher/courses/${id}/edit`); return { ok: true, message: "Course berhasil diperbarui." };
   } catch (error) { return { ok: false, message: error.message || "Gagal memperbarui course." }; }
