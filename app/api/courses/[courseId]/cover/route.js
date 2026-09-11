@@ -1,10 +1,9 @@
-import { Readable } from "node:stream";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { authorize, canManageCourse } from "@/lib/auth/dal";
 import { AppError, errorResponse } from "@/lib/errors";
 import { assertSameOrigin } from "@/lib/image/server";
-import { getStorageObject, removeStorageObject, statStorageObject } from "@/lib/storage/minio";
+import { createPlaybackUrl, removeStorageObject } from "@/lib/storage/minio";
 
 function mayViewCourse(user, course) {
   if (user.role === "ADMIN") return true;
@@ -29,13 +28,12 @@ export async function GET(_request, { params }) {
     if (!course || !mayViewCourse(user, course)) throw new AppError("Cover tidak ditemukan.", 404, "NOT_FOUND");
     if (!course.coverImageKey) throw new AppError("Cover belum tersedia.", 404, "NOT_FOUND");
 
-    const [stat, stream] = await Promise.all([statStorageObject(course.coverImageKey), getStorageObject(course.coverImageKey)]);
-    return new Response(Readable.toWeb(stream), {
+    const location = await createPlaybackUrl(course.coverImageKey);
+    return new Response(null, {
+      status: 307,
       headers: {
-        "Content-Type": "image/webp",
-        "Content-Length": String(stat.size),
+        Location: location,
         "Cache-Control": "private, max-age=3600",
-        "X-Content-Type-Options": "nosniff",
       },
     });
   } catch (error) {

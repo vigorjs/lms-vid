@@ -6,7 +6,7 @@ import { coverCompleteSchema } from "@/lib/validation";
 import { MAX_COVER_OUTPUT_BYTES } from "@/lib/image/constants";
 import { assertCoverObjectKey, assertSameOrigin } from "@/lib/image/server";
 import { hasWebpSignature } from "@/lib/image/validation";
-import { readStorageObjectPrefix, removeStorageObject, statVideoIfExists } from "@/lib/storage/minio";
+import { readStorageObjectRange, removeStorageObject } from "@/lib/storage/minio";
 
 function revalidateCourse(courseId) {
   revalidatePath("/dashboard");
@@ -32,11 +32,16 @@ async function contextFor(request, params) {
 export async function POST(request, { params }) {
   try {
     const { course, input } = await contextFor(request, params);
-    const stat = await statVideoIfExists(input.objectKey);
-    if (!stat) throw new AppError("File cover tidak ditemukan di storage.", 404, "OBJECT_NOT_FOUND");
-    if (Number(stat.size) <= 0 || Number(stat.size) > MAX_COVER_OUTPUT_BYTES) throw new AppError("Ukuran cover tidak valid.", 400, "INVALID_COVER_SIZE");
-    const prefix = await readStorageObjectPrefix(input.objectKey, 12);
-    if (!hasWebpSignature(prefix)) throw new AppError("File cover bukan WebP yang valid.", 400, "INVALID_COVER_FILE");
+    let object;
+    try {
+      object = await readStorageObjectRange(input.objectKey, 12);
+    } catch (error) {
+      console.error("Gagal memverifikasi cover di storage", error);
+      throw new AppError("Storage cover tidak dapat diverifikasi.", 502, "STORAGE_UNAVAILABLE");
+    }
+    if (!object) throw new AppError("File cover tidak ditemukan di storage.", 404, "OBJECT_NOT_FOUND");
+    if (Number(object.size) <= 0 || Number(object.size) > MAX_COVER_OUTPUT_BYTES) throw new AppError("Ukuran cover tidak valid.", 400, "INVALID_COVER_SIZE");
+    if (!hasWebpSignature(object.buffer)) throw new AppError("File cover bukan WebP yang valid.", 400, "INVALID_COVER_FILE");
 
     await db.course.update({ where: { id: course.id }, data: { coverImageKey: input.objectKey, coverUpdatedAt: new Date() } });
     if (course.coverImageKey && course.coverImageKey !== input.objectKey) {
@@ -53,7 +58,7 @@ export async function DELETE(request, { params }) {
   try {
     const { course, input } = await contextFor(request, params);
     if (course.coverImageKey === input.objectKey) throw new AppError("Cover aktif tidak dapat dibersihkan sebagai upload gagal.", 409, "COVER_IS_ACTIVE");
-    if (await statVideoIfExists(input.objectKey)) await removeStorageObject(input.objectKey);
+    await removeStorageObject(input.objectKey);
     return new Response(null, { status: 204 });
   } catch (error) {
     return errorResponse(error);
