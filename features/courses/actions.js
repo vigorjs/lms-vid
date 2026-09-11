@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { authorize, canManageCourse } from "@/lib/auth/dal";
 import { courseSchema } from "@/lib/validation";
 import { slugify } from "@/lib/utils";
+import { actionErrorMessage } from "@/lib/errors";
 
 async function uniqueSlug(title, excludeId) {
   const root = slugify(title); let slug = root; let suffix = 1;
@@ -24,7 +25,7 @@ export async function createCourse(_state, formData) {
     const teacher = await db.user.findFirst({ where: { id: teacherId, role: "TEACHER", status: "ACTIVE" } }); if (!teacher) throw new Error("Teacher tidak valid.");
     const course = await db.course.create({ data: { title: values.title, slug: await uniqueSlug(values.title), description: values.description, categoryId: values.categoryId, teacherId, passThreshold: values.passThreshold, rubricCriteria: { create: values.criteria.map((item, sortOrder) => ({ ...item, sortOrder })) } } });
     return { ok: true, message: "Course berhasil dibuat.", redirectTo: `/teacher/courses/${course.id}/edit` };
-  } catch (error) { return { ok: false, message: error.message || "Gagal membuat course." }; }
+  } catch (error) { return { ok: false, message: actionErrorMessage(error, "Gagal membuat course.") }; }
 }
 export async function updateCourse(_state, formData) {
   try {
@@ -47,7 +48,7 @@ export async function updateCourse(_state, formData) {
       },
     });
     revalidatePath(`/teacher/courses/${id}/edit`); return { ok: true, message: "Course berhasil diperbarui." };
-  } catch (error) { return { ok: false, message: error.message || "Gagal memperbarui course." }; }
+  } catch (error) { return { ok: false, message: actionErrorMessage(error, "Gagal memperbarui course.") }; }
 }
 export async function publishCourse(_state, formData) {
   try {
@@ -59,7 +60,7 @@ export async function publishCourse(_state, formData) {
     await db.course.update({ where: { id }, data: { status: "PUBLISHED", archivedAt: null } }); revalidatePath("/courses"); revalidatePath(`/teacher/courses/${id}/edit`);
     return { ok: true, message: "Course berhasil diterbitkan." };
   } catch (error) {
-    return { ok: false, message: error.message || "Gagal menerbitkan course." };
+    return { ok: false, message: actionErrorMessage(error, "Gagal menerbitkan course.") };
   }
 }
 export async function archiveCourse(_state, formData) {
@@ -68,6 +69,6 @@ export async function archiveCourse(_state, formData) {
     await db.course.update({ where: { id }, data: { status: "ARCHIVED", archivedAt: new Date() } }); revalidatePath("/courses"); revalidatePath("/teacher/courses"); revalidatePath(`/teacher/courses/${id}/edit`);
     return { ok: true, message: "Course berhasil diarsipkan." };
   } catch (error) {
-    return { ok: false, message: error.message || "Gagal mengarsipkan course." };
+    return { ok: false, message: actionErrorMessage(error, "Gagal mengarsipkan course.") };
   }
 }

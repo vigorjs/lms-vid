@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { authorize, canManageCourse } from "@/lib/auth/dal";
+import { actionErrorMessage } from "@/lib/errors";
 import { calculateWeightedScore, canPassReview } from "./scoring";
 
 const reviewSchema = z.object({
@@ -69,5 +70,5 @@ export async function saveReview(_state, formData) {
     ]);
     revalidatePath(`/teacher/reviews/${submission.id}`); revalidatePath(`/courses/${submission.courseId}`); revalidatePath("/dashboard");
     return { ok: true, message: "Review berhasil dipublikasikan." };
-  } catch (error) { return { ok: false, message: error.message || "Gagal menyimpan review." }; }
+  } catch (error) { return { ok: false, message: actionErrorMessage(error, "Gagal menyimpan review.") }; }
 }
