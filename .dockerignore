@@ -1,0 +1,12 @@
+.git
+.next
+node_modules
+generated
+public/ffmpeg
+.env
+.env.*
+tests
+e2e
+coverage
+test-results
+playwright-report

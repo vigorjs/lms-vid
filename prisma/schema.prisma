@@ -39,9 +39,16 @@ enum VideoKind {
 
 enum VideoStatus {
   UPLOADING
+  PROCESSING
   READY
   FAILED
   DELETED
+}
+
+enum ProcessingJobStatus {
+  PENDING
+  RUNNING
+  COMPLETE
 }
 
 enum SubmissionStatus {
@@ -64,7 +71,7 @@ model User {
   id                 String             @id @default(cuid())
   name               String
   email              String             @unique
-  passwordHash       String
+  passwordHash       String?
   role               Role               @default(STUDENT)
   status             UserStatus         @default(ACTIVE)
   authVersion        Int                @default(1)
@@ -190,6 +197,7 @@ model VideoAsset {
   versionNumber        Int?
   kind                 VideoKind
   status               VideoStatus  @default(UPLOADING)
+  processingError      String?
   objectKey            String       @unique
   multipartUploadId    String?      @unique
   multipartPartSize    Int?
@@ -213,11 +221,28 @@ model VideoAsset {
   originalFor          Submission[] @relation("OriginalSubmissionVideo")
   activeFor            Submission[] @relation("ActiveSubmissionVideo")
   referenceSnapshotFor Submission[] @relation("SubmissionReferenceVideo")
+  processingJob        VideoProcessingJob?
 
   @@index([ownerId, kind, status])
   @@index([courseId, kind, status])
   @@index([submissionId, status, createdAt])
   @@unique([submissionId, versionNumber])
+}
+
+model VideoProcessingJob {
+  assetId     String              @id
+  status      ProcessingJobStatus @default(PENDING)
+  attempts    Int                 @default(0)
+  leaseUntil  DateTime?
+  sourceKey   String
+  outputKey   String
+  lastError   String?
+  sourceDeletedAt DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  asset       VideoAsset          @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([status, leaseUntil, createdAt])
 }
 
 model Submission {

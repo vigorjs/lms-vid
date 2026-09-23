@@ -6,7 +6,7 @@ import { PrismaClient } from "../generated/prisma/client.ts";
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const db = new PrismaClient({ adapter });
 
-const passwordHash = await hash(process.env.DEMO_PASSWORD || "Demo123!", {
+const passwordHash = await hash("696969", {
   memoryCost: 19456,
   timeCost: 2,
   parallelism: 1,
@@ -37,4 +37,4 @@ await db.category.upsert({
 });
 
 await db.$disconnect();
-console.log("Seed selesai. Password akun demo:", process.env.DEMO_PASSWORD || "Demo123!");
+console.log("Seed selesai. PIN akun demo: 696969");

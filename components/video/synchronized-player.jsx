@@ -23,7 +23,7 @@ export function SynchronizedPlayer({ referenceAssetId, studentAssetId, courseId,
   const stageRef = useRef(null);
   const rafRef = useRef();
   const loopRef = useRef();
-  const lastProgress = useRef(0);
+  const lastProgress = useRef({ sentAt: 0, position: -1 });
   const sourceKey = `${referenceAssetId || ""}:${studentAssetId || ""}`;
   const [media, setMedia] = useState({ sourceKey: "", urls: { teacher: null, student: null }, error: "" });
   const [synced, setSynced] = useState(true);
@@ -32,6 +32,8 @@ export function SynchronizedPlayer({ referenceAssetId, studentAssetId, courseId,
   const urls = media.sourceKey === sourceKey ? media.urls : { teacher: null, student: null };
   const error = media.sourceKey === sourceKey ? media.error : "";
   const commonDuration = getCommonDuration(tracks.teacher.duration, studentAssetId ? tracks.student.duration : 0);
+
+  useEffect(() => { lastProgress.current = { sentAt: 0, position: -1 }; }, [courseId, sourceKey]);
 
   const updateTracks = useCallback((updater) => {
     setTracks((current) => {
@@ -59,7 +61,25 @@ export function SynchronizedPlayer({ referenceAssetId, studentAssetId, courseId,
     return () => { active = false; };
   }, [referenceAssetId, sourceKey, studentAssetId, updateTracks]);
 
+  const saveProgress = useCallback((force = false) => {
+    const video = teacherRef.current;
+    const durationSeconds = video?.duration;
+    const positionSeconds = video?.currentTime;
+    if (!trackProgress || !courseId || !Number.isFinite(durationSeconds) || !Number.isFinite(positionSeconds) || durationSeconds <= 0) return;
+    const now = Date.now();
+    if (!force && now - lastProgress.current.sentAt < 30_000) return;
+    if (force && Math.abs(positionSeconds - lastProgress.current.position) < 1) return;
+    lastProgress.current = { sentAt: now, position: positionSeconds };
+    fetch(`/api/progress/${courseId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ positionSeconds, durationSeconds }),
+      keepalive: force,
+    }).catch(() => {});
+  }, [courseId, trackProgress]);
+
   const pauseAll = useCallback(() => {
+    saveProgress(true);
     teacherRef.current?.pause();
     studentRef.current?.pause();
     updateTracks((current) => ({
@@ -67,7 +87,7 @@ export function SynchronizedPlayer({ referenceAssetId, studentAssetId, courseId,
       student: { ...current.student, playing: false },
     }));
     cancelAnimationFrame(rafRef.current);
-  }, [updateTracks]);
+  }, [saveProgress, updateTracks]);
 
   const loop = useCallback(() => {
     const teacher = teacherRef.current;
@@ -94,15 +114,12 @@ export function SynchronizedPlayer({ referenceAssetId, studentAssetId, courseId,
     }));
     onTimeChange?.(synced || !student ? teacherTime : studentTime);
 
-    if (trackProgress && courseId && teacherPlaying && teacherTime - lastProgress.current >= 10) {
-      lastProgress.current = teacherTime;
-      fetch(`/api/progress/${courseId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ positionSeconds: teacherTime, durationSeconds: tracksRef.current.teacher.duration }) }).catch(() => {});
-    }
+    if (teacherPlaying) saveProgress();
     if (teacherPlaying || studentPlaying) rafRef.current = requestAnimationFrame(() => loopRef.current?.());
-  }, [commonDuration, courseId, onTimeChange, pauseAll, synced, trackProgress, updateTracks]);
+  }, [commonDuration, onTimeChange, pauseAll, saveProgress, synced, updateTracks]);
 
   useEffect(() => { loopRef.current = loop; }, [loop]);
-  useEffect(() => () => cancelAnimationFrame(rafRef.current), []);
+  useEffect(() => () => { saveProgress(true); cancelAnimationFrame(rafRef.current); }, [saveProgress]);
 
   const startLoop = useCallback(() => {
     cancelAnimationFrame(rafRef.current);
@@ -255,10 +272,10 @@ export function SynchronizedPlayer({ referenceAssetId, studentAssetId, courseId,
   }
 
   return <section ref={stageRef} className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 text-white shadow-xl">
-    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 px-4 py-3"><div><strong className="text-sm">Studio perbandingan</strong><p className="text-xs text-slate-400">{synced ? "Kontrol kedua video dari satu timeline" : "Setiap video memiliki kontrol custom sendiri"}</p></div><div className="flex items-center gap-2"><button type="button" aria-label={synced ? "Aktifkan kontrol terpisah" : "Aktifkan sinkronisasi"} onClick={toggleSyncMode} className={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 ${synced ? "bg-cyan-400 text-slate-950 hover:bg-cyan-300" : "bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white"}`}>{synced ? <LockKeyhole size={15}/> : <UnlockKeyhole size={15}/>} {synced ? "Sinkron aktif" : "Kontrol terpisah"}</button>{headerActions}</div></div>
+    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 px-4 py-3"><div><strong className="text-base">Studio perbandingan</strong><p className="text-sm text-slate-300">{synced ? "Kontrol kedua video dari satu timeline" : "Setiap video memiliki kontrol custom sendiri"}</p></div><div className="flex flex-wrap items-center gap-2"><button type="button" aria-label={synced ? "Aktifkan kontrol terpisah" : "Aktifkan sinkronisasi"} onClick={toggleSyncMode} className={`inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-base font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 ${synced ? "bg-cyan-400 text-slate-950 hover:bg-cyan-300" : "bg-slate-800 text-slate-100 hover:bg-slate-700 hover:text-white"}`}>{synced ? <LockKeyhole size={15}/> : <UnlockKeyhole size={15}/>} {synced ? "Sinkron aktif" : "Kontrol terpisah"}</button>{headerActions}</div></div>
     {error ? <div className="m-4 rounded-xl bg-rose-950/60 p-4 text-sm text-rose-200">{error}</div> : null}
     <div className="grid gap-px bg-slate-800 lg:grid-cols-2">
-      <VideoPane label="Video teacher" subtitle="Reference video" paneRef={teacherPaneRef} videoRef={teacherRef} url={urls.teacher} onLoaded={(video) => loaded("teacher", video)} onPlay={() => { updateTrack("teacher", { playing: true }); startLoop(); }} onPause={() => updateTrack("teacher", { playing: false })} controls={!synced ? <PlayerControls name="Video teacher" {...tracks.teacher} compact onToggle={() => toggleTrack("teacher")} onSeek={(value) => seekTrack("teacher", value)} onPause={() => pauseTrack("teacher")} onRate={(value) => setTrackRate("teacher", value)} onVolume={(value) => setTrackVolume("teacher", value)} onMute={() => toggleTrackMute("teacher")} onFullscreen={() => fullscreen(teacherPaneRef)} /> : null} />
+      <VideoPane label="Video teacher" subtitle="Reference video" paneRef={teacherPaneRef} videoRef={teacherRef} url={urls.teacher} onLoaded={(video) => loaded("teacher", video)} onPlay={() => { updateTrack("teacher", { playing: true }); startLoop(); }} onPause={() => { saveProgress(true); updateTrack("teacher", { playing: false }); }} controls={!synced ? <PlayerControls name="Video teacher" {...tracks.teacher} compact onToggle={() => toggleTrack("teacher")} onSeek={(value) => seekTrack("teacher", value)} onPause={() => pauseTrack("teacher")} onRate={(value) => setTrackRate("teacher", value)} onVolume={(value) => setTrackVolume("teacher")} onMute={() => toggleTrackMute("teacher")} onFullscreen={() => fullscreen(teacherPaneRef)} /> : null} />
       <VideoPane label="Video student" subtitle="Attempt aktif" paneRef={studentPaneRef} videoRef={studentRef} url={urls.student} onLoaded={(video) => loaded("student", video)} onPlay={() => { updateTrack("student", { playing: true }); startLoop(); }} onPause={() => updateTrack("student", { playing: false })} controls={!synced && urls.student ? <PlayerControls name="Video student" {...tracks.student} compact onToggle={() => toggleTrack("student")} onSeek={(value) => seekTrack("student", value)} onPause={() => pauseTrack("student")} onRate={(value) => setTrackRate("student", value)} onVolume={(value) => setTrackVolume("student", value)} onMute={() => toggleTrackMute("student")} onFullscreen={() => fullscreen(studentPaneRef)} /> : null} empty="Upload video Anda untuk mulai membandingkan." />
     </div>
     {synced ? <PlayerControls name="sinkron" {...tracks.teacher} duration={commonDuration} onToggle={toggleSynchronizedPlayback} onSeek={seekSynchronized} onPause={pauseAll} onRate={setSynchronizedRate} onVolume={setSynchronizedVolume} onMute={toggleSynchronizedMute} onFullscreen={() => fullscreen(stageRef)} /> : null}
@@ -266,5 +283,5 @@ export function SynchronizedPlayer({ referenceAssetId, studentAssetId, courseId,
 }
 
 function VideoPane({ label, subtitle, paneRef, videoRef, url, onLoaded, onPlay, onPause, controls, empty }) {
-  return <div ref={paneRef} className="relative min-h-64 bg-black"><div className="absolute left-3 top-3 z-10 rounded-lg bg-black/60 px-3 py-2 backdrop-blur"><strong className="block text-xs">{label}</strong><span className="text-[11px] text-slate-400">{subtitle}</span></div>{url ? <><video ref={videoRef} src={url} crossOrigin="anonymous" playsInline controls={false} onLoadedMetadata={(event) => onLoaded(event.currentTarget)} onPlay={onPlay} onPause={onPause} onEnded={onPause} className="aspect-video w-full object-contain" />{controls}</> : <div className="grid aspect-video place-items-center p-8 text-center text-sm text-slate-500"><span>{empty || "Memuat video…"}</span></div>}</div>;
+  return <div ref={paneRef} className="relative min-w-0 bg-black"><div className="absolute left-3 top-3 z-10 rounded-lg bg-black/75 px-3 py-2 backdrop-blur"><strong className="block text-sm">{label}</strong><span className="text-xs text-slate-200">{subtitle}</span></div>{url ? <><video ref={videoRef} src={url} crossOrigin="anonymous" playsInline controls={false} onLoadedMetadata={(event) => onLoaded(event.currentTarget)} onPlay={onPlay} onPause={onPause} onEnded={onPause} className="aspect-video w-full max-w-full object-contain" />{controls}</> : <div className="grid aspect-video place-items-center p-8 text-center text-base text-slate-300"><span>{empty || "Memuat video…"}</span></div>}</div>;
 }

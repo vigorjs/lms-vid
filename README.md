@@ -8,6 +8,7 @@ LMS video untuk pembelajaran gerakan olahraga. Student dapat membandingkan video
 - PostgreSQL + Prisma ORM 7
 - JWT `HttpOnly` cookie dengan authorization berbasis role dan `authVersion`
 - MinIO private bucket dengan multipart presigned upload dan playback URL
+- Worker FFmpeg pada VPS untuk kompresi video 720p setelah upload
 - ffmpeg.wasm untuk trim client-side
 - react-easy-crop dan Canvas untuk cover course 16:9
 - Vitest dan Playwright
@@ -40,7 +41,15 @@ Prasyarat: Node.js 20.20+, PostgreSQL yang berjalan di `localhost:5432`, dan Doc
    npm run db:seed
    ```
 
-6. Jalankan aplikasi:
+6. Jika PostgreSQL terpasang di komputer, atur `WORKER_DATABASE_URL` di `.env` dengan host `host.docker.internal` (kredensial dan nama database sama seperti `DATABASE_URL`). Jalankan worker:
+
+   ```bash
+   docker compose up -d --build video-worker
+   ```
+
+   PostgreSQL container tidak perlu dinyalakan. `localhost` pada URL worker menunjuk ke container, bukan komputer. Jika URL worker diubah, buat ulang container dengan `docker compose up -d --no-deps --force-recreate video-worker`.
+
+7. Jalankan aplikasi:
 
    ```bash
    npm run dev
@@ -60,9 +69,17 @@ Gunakan dua koneksi terpisah:
 
 Setelah mengubah environment variable di Vercel, lakukan redeploy karena deployment lama tidak mengambil nilai yang baru.
 
+## VPS PostgreSQL, MinIO, dan worker video
+
+`docker-compose.yml` menyediakan PostgreSQL, MinIO, dan satu worker FFmpeg. PostgreSQL container masuk profil `bundled-db`, sehingga tidak berjalan pada setup lokal yang memakai PostgreSQL host. Di VPS, siapkan `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `WORKER_DATABASE_URL`, serta kredensial MinIO di `.env`. `WORKER_DATABASE_URL` di VPS memakai host `postgres` di jaringan Compose; `DATABASE_URL` dan `DIRECT_URL` aplikasi Vercel memakai alamat PostgreSQL yang dapat dijangkau dari Vercel.
+
+Jalankan migrasi `npm run db:deploy` sebelum mengaktifkan worker, lalu `docker compose --profile bundled-db up -d --build`. Worker dibatasi satu CPU dan satu GB RAM. Upload yang selesai masuk status `PROCESSING`. MP4 H.264/AAC yang sudah maksimal 720p/30 fps siap tanpa encode ulang; bila metadata MP4 belum di depan, worker hanya melakukan remux. Video lain dikompresi ke 720p/30 fps. Jika encoding gagal tiga kali, worker memakai file asli yang masih valid. Log worker mencatat waktu antrean, unduh, proses, dan unggah/finalisasi. Pantau antrean `VideoProcessingJob`, ruang disk, serta trafik MinIO. Video lama tidak dikompresi ulang.
+
+Berkas FFmpeg untuk editor browser disalin dari `node_modules` ke `public/ffmpeg` saat instalasi, dev, dan build. Aset ini dilayani sebagai file statis, bukan melalui Vercel Function.
+
 ## Akun demo
 
-Password default mengikuti `DEMO_PASSWORD` dan bernilai `Demo123!` bila tidak diubah.
+PIN akun demo dan seluruh akun yang sudah ada adalah `696969`.
 
 | Role | Email |
 | --- | --- |
@@ -70,14 +87,14 @@ Password default mengikuti `DEMO_PASSWORD` dan bernilai `Demo123!` bila tidak di
 | Teacher | `teacher@local.test` |
 | Student | `student@local.test` |
 
-Admin membuat seluruh akun tambahan; tidak ada registrasi publik.
+Student dapat mendaftar lewat `/register` dengan email dan nama lengkap opsional. Setelah masuk, mereka wajib membuat PIN 6 digit sebelum membuka materi. Akun baru yang dibuat admin memakai PIN awal `696969` dan wajib menggantinya pada login pertama. Registrasi tidak memverifikasi kepemilikan email.
 
 ## Alur utama
 
 1. Admin membuat category dan akun teacher/student.
 2. Teacher membuat course dan rubric dengan total bobot 100%, lalu memilih akses `PUBLIC` atau `ASSIGNED` untuk student tertentu.
 3. Teacher dapat mengatur cover course, mengupload reference video MP4, lalu menerbitkan course. Course `ASSIGNED` membutuhkan minimal satu student aktif sebelum dapat diterbitkan.
-4. Student membuka course, mengupload video latihan, membandingkan kedua video, dan dapat menyimpan hasil trim sebagai versi baru.
+4. Student membuka course, mengupload video latihan, menunggu kompresi selesai, membandingkan kedua video, dan dapat menyimpan hasil trim sebagai versi baru setelah diproses.
 5. Student mengirim draft sebagai submission yang immutable.
 6. Teacher memberi skor per kriteria, keputusan lulus/revisi, feedback umum, dan komentar bertimestamp.
 7. Student melihat nilai serta feedback pada halaman course.
@@ -125,7 +142,7 @@ E2E membutuhkan PostgreSQL yang sudah dimigrasi/seed dan MinIO yang aktif.
 ## Catatan keamanan
 
 - JWT berlaku 8 jam dan disimpan di cookie `HttpOnly`, `SameSite=Lax`, serta `Secure` pada production.
-- Perubahan password, role, atau status menaikkan `authVersion` dan membatalkan JWT lama.
+- Perubahan PIN, role, atau status menaikkan `authVersion` dan membatalkan JWT lama.
 - `proxy.js` hanya melakukan redirect awal; semua akses data dan mutasi mengulang authorization di DAL/action.
 - Mutasi upload memeriksa origin, role, ownership, ukuran, metadata, kelengkapan setiap part, dan object MinIO setelah completion.
 - Upload yang dibatalkan atau gagal setelah tiga percobaan akan menghapus sesi multipart dan menandai asset sebagai `FAILED`.

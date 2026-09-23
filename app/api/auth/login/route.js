@@ -9,14 +9,14 @@ export async function POST(request) {
     const input = loginSchema.parse(await request.json());
     const user = await db.user.findUnique({ where: { email: input.email } });
     const now = new Date();
-    if (!user || user.status !== "ACTIVE") throw new AppError("Email atau password salah.", 401, "INVALID_CREDENTIALS");
+    if (!user || user.status !== "ACTIVE" || !user.passwordHash) throw new AppError("Email atau PIN salah.", 401, "INVALID_CREDENTIALS");
     if (user.lockedUntil && user.lockedUntil > now) throw new AppError("Akun terkunci sementara. Coba kembali beberapa menit lagi.", 423, "ACCOUNT_LOCKED");
 
-    const valid = await verify(user.passwordHash, input.password);
+    const valid = await verify(user.passwordHash, input.pin);
     if (!valid) {
       const failures = user.failedLoginCount + 1;
       await db.user.update({ where: { id: user.id }, data: { failedLoginCount: failures >= 5 ? 0 : failures, lockedUntil: failures >= 5 ? new Date(Date.now() + 15 * 60 * 1000) : null } });
-      throw new AppError("Email atau password salah.", 401, "INVALID_CREDENTIALS");
+      throw new AppError("Email atau PIN salah.", 401, "INVALID_CREDENTIALS");
     }
     const sessionUser = await db.user.update({
       where: { id: user.id },
@@ -24,7 +24,7 @@ export async function POST(request) {
       select: { id: true, role: true, authVersion: true, name: true },
     });
     await createSession(sessionUser);
-    return Response.json({ data: { name: sessionUser.name, role: sessionUser.role } });
+    return Response.json({ data: { name: sessionUser.name, role: sessionUser.role, needsPinSetup: user.mustChangePassword } });
   } catch (error) {
     return errorResponse(error);
   }

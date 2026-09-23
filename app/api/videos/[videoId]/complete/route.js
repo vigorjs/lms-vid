@@ -1,4 +1,4 @@
-import { db, dbTransactionOptions } from "@/lib/db";
+import { db } from "@/lib/db";
 import { authorize, canManageCourse } from "@/lib/auth/dal";
 import {
   abortMultipartUpload,
@@ -10,6 +10,7 @@ import { MAX_VIDEO_BYTES } from "@/lib/video/constants";
 import { normalizeUploadedParts } from "@/lib/video/multipart";
 import { AppError, errorResponse } from "@/lib/errors";
 import { canAccessCourse } from "@/lib/courses/access";
+import { readyVideoResult } from "@/lib/video/finalize";
 
 function assertSameOrigin(request) {
   const origin = request.headers.get("origin");
@@ -66,76 +67,28 @@ async function ensureMultipartObject(asset) {
   assertValidObjectSize(asset, stat);
 }
 
-async function readyResult(asset, submissionId, client = db) {
-  if (asset.kind === "REFERENCE") return { assetId: asset.id, submissionId: null };
-  const submission = await client.submission.findFirst({
-    where: asset.kind === "STUDENT_ORIGINAL"
-      ? { originalVideoId: asset.id, studentId: asset.ownerId }
-      : { id: String(submissionId || ""), activeVideoId: asset.id, studentId: asset.ownerId },
-    select: { id: true },
-  });
-  return { assetId: asset.id, submissionId: submission?.id || null };
-}
-
-async function finalizeAsset(asset, user, submissionId) {
-  return db.$transaction(async (tx) => {
-    const claimed = await tx.videoAsset.updateMany({
-      where: { id: asset.id, status: "UPLOADING" },
-      data: { status: "READY", multipartUploadId: null },
-    });
-    if (claimed.count === 0) return readyResult(asset, submissionId, tx);
-
-    if (asset.kind === "REFERENCE") {
-      await tx.course.update({ where: { id: asset.courseId }, data: { referenceVideoId: asset.id } });
-      return { assetId: asset.id, submissionId: null };
-    }
-
-    if (asset.kind === "STUDENT_ORIGINAL") {
-      const aggregate = await tx.submission.aggregate({
-        where: { courseId: asset.courseId, studentId: user.id },
-        _max: { attemptNumber: true },
-      });
-      const referenceVideoId = asset.course.referenceVideoId;
-      if (!referenceVideoId) throw new AppError("Video referensi course tidak tersedia.", 409, "REFERENCE_NOT_FOUND");
-      const submission = await tx.submission.create({
-        data: {
-          courseId: asset.courseId,
-          studentId: user.id,
-          originalVideoId: asset.id,
-          activeVideoId: asset.id,
-          referenceVideoId,
-          attemptNumber: (aggregate._max.attemptNumber || 0) + 1,
-        },
-      });
-      await tx.videoAsset.update({
-        where: { id: asset.id },
-        data: { submissionId: submission.id, versionNumber: 0 },
-      });
-      return { assetId: asset.id, submissionId: submission.id };
-    }
-
-    const submission = await tx.submission.findFirst({
-      where: { id: String(submissionId || ""), studentId: user.id, courseId: asset.courseId, status: "DRAFT" },
-    });
-    if (!submission) throw new AppError("Draft submission tidak ditemukan.", 404, "DRAFT_NOT_FOUND");
-    await tx.submission.update({ where: { id: submission.id }, data: { activeVideoId: asset.id } });
-    return { assetId: asset.id, submissionId: submission.id };
-  }, dbTransactionOptions);
-}
-
 export async function POST(request, { params }) {
   try {
     assertSameOrigin(request);
     const user = await authorize();
     const { videoId } = await params;
-    const body = await request.json().catch(() => ({}));
     const asset = await findAsset(videoId, user);
 
-    if (asset.status === "READY") return Response.json({ data: await readyResult(asset, body.submissionId) });
+    if (asset.status === "READY") return Response.json({ data: await readyVideoResult(asset, db) });
+    if (asset.status === "PROCESSING") return Response.json({ data: { assetId: asset.id, submissionId: asset.submissionId, status: "PROCESSING" } });
     if (asset.status !== "UPLOADING") throw new AppError("Upload tidak dapat diselesaikan.", 409, "INVALID_UPLOAD_STATUS");
 
     await ensureMultipartObject(asset);
-    return Response.json({ data: await finalizeAsset(asset, user, body.submissionId) });
+    await db.$transaction(async (tx) => {
+      const claimed = await tx.videoAsset.updateMany({
+        where: { id: asset.id, status: "UPLOADING" },
+        data: { status: "PROCESSING", multipartUploadId: null },
+      });
+      if (claimed.count) await tx.videoProcessingJob.create({
+        data: { assetId: asset.id, sourceKey: asset.objectKey, outputKey: `${asset.objectKey.slice(0, -4)}-optimized.mp4` },
+      });
+    });
+    return Response.json({ data: { assetId: asset.id, submissionId: asset.submissionId, status: "PROCESSING" } });
   } catch (error) {
     return errorResponse(error);
   }

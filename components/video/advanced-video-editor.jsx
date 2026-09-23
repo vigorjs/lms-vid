@@ -13,6 +13,7 @@ import { uploadVideoAsset } from "./video-uploader";
 import { buildFfmpegArgs, EDIT_SPEEDS, normalizeCrop, outputDuration } from "@/lib/video/edit-spec";
 import { MAX_VIDEO_BYTES, MAX_VIDEO_DURATION_SECONDS } from "@/lib/video/constants";
 import { formatBytes, formatDuration } from "@/lib/utils";
+import { ffmpegAssetUrls } from "@/generated/ffmpeg-assets.js";
 
 const ASPECTS = [
   { key: "source", label: "Original" },
@@ -261,12 +262,12 @@ export function AdvancedVideoEditor({ courseId, submissionId, sourceAssetId, dur
       ffmpeg.on("log", ({ message }) => { if (message.includes("frame=")) setStatus("Merender dan menggabungkan segmen…"); });
       const multi = window.crossOriginIsolated;
       await ffmpeg.load(multi ? {
-        coreURL: "/api/media-core?asset=mt-js",
-        wasmURL: "/api/media-core?asset=mt-wasm",
-        workerURL: "/api/media-core?asset=mt-worker",
+        coreURL: `${ffmpegAssetUrls["core-mt"]}/ffmpeg-core.js`,
+        wasmURL: `${ffmpegAssetUrls["core-mt"]}/ffmpeg-core.wasm`,
+        workerURL: `${ffmpegAssetUrls["core-mt"]}/ffmpeg-core.worker.js`,
       } : {
-        coreURL: "/api/media-core?asset=single-js",
-        wasmURL: "/api/media-core?asset=single-wasm",
+        coreURL: `${ffmpegAssetUrls.core}/ffmpeg-core.js`,
+        wasmURL: `${ffmpegAssetUrls.core}/ffmpeg-core.wasm`,
       });
       if (cancelledRef.current) throw new DOMException("Dibatalkan", "AbortError");
       setProgress(12);
@@ -295,7 +296,7 @@ export function AdvancedVideoEditor({ courseId, submissionId, sourceAssetId, dur
         onProgress: (value) => setProgress(72 + Math.round(value * 0.28)),
         signal: controller.signal,
       });
-      toast.success("Versi edit baru berhasil disimpan dan diaktifkan.");
+      toast.success("Hasil edit diupload dan sedang disiapkan. Versi aktif akan berubah saat siap.");
       router.refresh();
     } catch (error) {
       if (!cancelledRef.current) toast.error(error.message || "Editor kehabisan memori atau gagal memproses video.");

@@ -3,15 +3,15 @@ import { hash } from "@node-rs/argon2";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { authorize } from "@/lib/auth/dal";
-import { passwordSchema, userSchema } from "@/lib/auth/schemas";
+import { pinSchema, userSchema } from "@/lib/auth/schemas";
 import { actionErrorMessage } from "@/lib/errors";
 
 const hashOptions = { memoryCost: 19456, timeCost: 2, parallelism: 1 };
 export async function createUser(_state, formData) {
   try {
     await authorize(["ADMIN"]);
-    const values = userSchema.extend({ password: passwordSchema }).parse(Object.fromEntries(formData));
-    const passwordHash = await hash(values.password, hashOptions);
+    const values = userSchema.parse(Object.fromEntries(formData));
+    const passwordHash = await hash("696969", hashOptions);
     await db.user.create({ data: { name: values.name, email: values.email, role: values.role, passwordHash, mustChangePassword: true } });
     revalidatePath("/admin/users"); return { ok: true, message: "Pengguna berhasil dibuat." };
   } catch (error) { return { ok: false, message: error.code === "P2002" ? "Email sudah digunakan." : actionErrorMessage(error, "Gagal membuat pengguna.") }; }
@@ -32,10 +32,10 @@ export async function updateUserStatus(_state, formData) {
     return { ok: false, message: actionErrorMessage(error, "Gagal memperbarui status pengguna.") };
   }
 }
-export async function resetUserPassword(_state, formData) {
+export async function resetUserPin(_state, formData) {
   try {
-    await authorize(["ADMIN"]); const id = String(formData.get("id")); const password = passwordSchema.parse(formData.get("password"));
-    await db.user.update({ where: { id }, data: { passwordHash: await hash(password, hashOptions), mustChangePassword: true, authVersion: { increment: 1 } } });
-    return { ok: true, message: "Password berhasil direset." };
-  } catch (error) { return { ok: false, message: actionErrorMessage(error, "Gagal mereset password.") }; }
+    await authorize(["ADMIN"]); const id = String(formData.get("id")); const pin = pinSchema.parse(formData.get("pin"));
+    await db.user.update({ where: { id }, data: { passwordHash: await hash(pin, hashOptions), mustChangePassword: true, authVersion: { increment: 1 } } });
+    return { ok: true, message: "PIN berhasil direset." };
+  } catch (error) { return { ok: false, message: actionErrorMessage(error, "Gagal mereset PIN.") }; }
 }

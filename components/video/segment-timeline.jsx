@@ -14,14 +14,12 @@ export function SegmentTimeline({ duration, segments, selectedIndex, onSelect, o
 
     <div className="relative h-14 overflow-hidden rounded-xl bg-slate-950" aria-label="Peta segmen video">
       <div className="absolute inset-x-3 top-2 flex justify-between font-mono text-[10px] text-slate-500"><span>0:00</span><span>{formatDuration(duration, true)}</span></div>
-      {segments.map((segment, index) => <button
-        type="button"
+      {segments.map((segment, index) => <span
         key={segment.id}
-        aria-label={`Pilih segmen ${index + 1}`}
-        onClick={() => onSelect(index)}
-        className={`absolute bottom-2 h-6 min-w-2 rounded-md border transition hover:-translate-y-0.5 hover:brightness-110 ${selectedIndex === index ? "border-cyan-200 bg-cyan-400" : "border-slate-500 bg-slate-600"}`}
+        aria-hidden="true"
+        className={`absolute bottom-2 h-6 min-w-2 rounded-md border ${selectedIndex === index ? "border-cyan-200 bg-cyan-400" : "border-slate-500 bg-slate-600"}`}
         style={{ left: `${(segment.startSeconds / duration) * 100}%`, width: `${Math.max(0.8, ((segment.endSeconds - segment.startSeconds) / duration) * 100)}%` }}
-      ><span className="sr-only">{formatDuration(segment.startSeconds, true)} sampai {formatDuration(segment.endSeconds, true)}</span></button>)}
+      />)}
     </div>
 
     <div className="flex gap-2 overflow-x-auto pb-1">
@@ -42,8 +40,8 @@ export function SegmentTimeline({ duration, segments, selectedIndex, onSelect, o
         <Field label="Selesai (detik)"><input className={inputClass} type="number" min={selected.startSeconds + 0.1} max={duration} step="0.01" value={selected.endSeconds} disabled={disabled} onChange={(event) => onBoundaryChange(selectedIndex, "endSeconds", Number(event.target.value))}/></Field>
       </div>
       <div className="grid gap-1">
-        <input aria-label="Batas mulai segmen" className="video-range w-full" type="range" min="0" max={duration} step="0.01" value={selected.startSeconds} disabled={disabled} onChange={(event) => onBoundaryChange(selectedIndex, "startSeconds", Number(event.target.value))}/>
-        <input aria-label="Batas akhir segmen" className="video-range w-full" type="range" min="0" max={duration} step="0.01" value={selected.endSeconds} disabled={disabled} onChange={(event) => onBoundaryChange(selectedIndex, "endSeconds", Number(event.target.value))}/>
+        <input aria-label="Batas mulai segmen" className="video-range h-11 w-full" type="range" min="0" max={duration} step="0.01" value={selected.startSeconds} disabled={disabled} onChange={(event) => onBoundaryChange(selectedIndex, "startSeconds", Number(event.target.value))}/>
+        <input aria-label="Batas akhir segmen" className="video-range h-11 w-full" type="range" min="0" max={duration} step="0.01" value={selected.endSeconds} disabled={disabled} onChange={(event) => onBoundaryChange(selectedIndex, "endSeconds", Number(event.target.value))}/>
       </div>
     </div> : null}
   </div>;

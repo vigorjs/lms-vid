@@ -31,6 +31,8 @@ async function resolveUploadContext(user, input) {
 
   if (input.purpose === "REFERENCE") {
     if (!canManageCourse(user, course)) throw new AppError("Tidak boleh mengubah video course ini.", 403, "FORBIDDEN");
+    const pending = await db.videoAsset.findFirst({ where: { courseId: course.id, kind: "REFERENCE", OR: [{ status: "PROCESSING" }, { status: "UPLOADING", createdAt: { gt: new Date(Date.now() - 30 * 60 * 1000) } }] }, select: { id: true } });
+    if (pending) throw new AppError("Video referensi sebelumnya masih diproses.", 409, "VIDEO_PROCESSING");
     return { course, kind: "REFERENCE", parent: null, submission: null, editSpec: null };
   }
 
@@ -41,6 +43,8 @@ async function resolveUploadContext(user, input) {
   if (input.purpose === "STUDENT_ORIGINAL") {
     const draft = await db.submission.findFirst({ where: { courseId: course.id, studentId: user.id, status: "DRAFT" } });
     if (draft) throw new AppError("Selesaikan draft aktif sebelum membuat attempt baru.", 409, "DRAFT_EXISTS");
+    const pending = await db.videoAsset.findFirst({ where: { courseId: course.id, ownerId: user.id, kind: "STUDENT_ORIGINAL", OR: [{ status: "PROCESSING" }, { status: "UPLOADING", createdAt: { gt: new Date(Date.now() - 30 * 60 * 1000) } }] }, select: { id: true } });
+    if (pending) throw new AppError("Video latihan sebelumnya masih diproses.", 409, "VIDEO_PROCESSING");
     return { course, kind: "STUDENT_ORIGINAL", parent: null, submission: null, editSpec: null };
   }
 
@@ -50,6 +54,8 @@ async function resolveUploadContext(user, input) {
   const submission = await db.submission.findFirst({
     where: { id: input.submissionId, studentId: user.id, courseId: course.id, status: "DRAFT" },
   });
+  const pendingEdit = submission && await db.videoAsset.findFirst({ where: { submissionId: submission.id, kind: "STUDENT_EDIT", OR: [{ status: "PROCESSING" }, { status: "UPLOADING", createdAt: { gt: new Date(Date.now() - 30 * 60 * 1000) } }] }, select: { id: true } });
+  if (pendingEdit) throw new AppError("Hasil edit sebelumnya masih diproses.", 409, "VIDEO_PROCESSING");
   const editSpec = input.editSpec || (input.trimStartSeconds !== undefined && input.trimEndSeconds !== undefined ? {
     segments: [{ startSeconds: input.trimStartSeconds, endSeconds: input.trimEndSeconds }],
     crop: null,

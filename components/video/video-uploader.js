@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { formatBytes, formatDuration } from "@/lib/utils";
 import { MAX_VIDEO_BYTES, MAX_VIDEO_DURATION_SECONDS } from "@/lib/video/constants";
 import { calculateMultipartProgress, createMultipartPlan, retryMultipartPart } from "@/lib/video/multipart";
+import { VideoProcessingStatus } from "./processing-status";
 
 export async function inspectVideo(file) {
   if (file.type !== "video/mp4" && !file.name.toLowerCase().endsWith(".mp4")) throw new Error("Gunakan file MP4 dengan codec H.264/AAC.");
@@ -106,7 +107,7 @@ export async function uploadVideoAsset({ courseId, purpose, file, durationSecond
   }
 }
 
-export function VideoUploader({ courseId, purpose, compact = false }) {
+export function VideoUploader({ courseId, purpose, compact = false, disabled = false }) {
   const inputRef = useRef(null);
   const cancelRef = useRef(null);
   const router = useRouter();
@@ -114,6 +115,7 @@ export function VideoUploader({ courseId, purpose, compact = false }) {
   const [duration, setDuration] = useState(0);
   const [progress, setProgress] = useState(0);
   const [pending, setPending] = useState(false);
+  const [processingId, setProcessingId] = useState(null);
 
   async function choose(event) {
     const selected = event.target.files?.[0];
@@ -135,7 +137,7 @@ export function VideoUploader({ courseId, purpose, compact = false }) {
     setPending(true);
     setProgress(0);
     try {
-      await uploadVideoAsset({
+      const result = await uploadVideoAsset({
         courseId,
         purpose,
         file,
@@ -143,7 +145,8 @@ export function VideoUploader({ courseId, purpose, compact = false }) {
         onProgress: setProgress,
         signal: controller.signal,
       });
-      toast.success(purpose === "REFERENCE" ? "Video referensi berhasil disimpan." : "Video latihan berhasil diupload.");
+      setProcessingId(result.assetId);
+      toast.success("Upload selesai. Video sedang disiapkan.");
       setFile(null);
       setProgress(0);
       if (inputRef.current) inputRef.current.value = "";
@@ -168,13 +171,14 @@ export function VideoUploader({ courseId, purpose, compact = false }) {
       <h3 className="mt-3 font-bold">Upload video MP4</h3>
       <p className="mt-1 text-xs text-slate-500">H.264/AAC · Maks. 100 MB · 10 menit</p>
     </> : null}
+    {processingId ? <VideoProcessingStatus assetId={processingId} /> : null}
     {pending ? <div className="mb-3">
       <div className="h-2 overflow-hidden rounded-full bg-slate-200"><div className="h-full bg-cyan-500 transition-all" style={{ width: `${progress}%` }} /></div>
       <p className="mt-1 text-xs text-slate-500">Mengupload multipart {progress}%</p>
     </div> : null}
     <div className="mt-4 flex justify-center gap-2">
-      <Button type="button" variant={file ? "outline" : "primary"} onClick={() => inputRef.current?.click()} disabled={pending}>{file ? "Ganti file" : "Pilih video"}</Button>
-      {file && !pending ? <Button type="button" onClick={upload}><UploadCloud size={17} /> Upload</Button> : null}
+      <Button type="button" variant={file ? "outline" : "primary"} onClick={() => inputRef.current?.click()} disabled={pending || disabled}>{file ? "Ganti file" : "Pilih video"}</Button>
+      {file && !pending ? <Button type="button" onClick={upload} disabled={disabled}><UploadCloud size={17} /> Upload</Button> : null}
       {pending ? <Button type="button" variant="danger" onClick={() => cancelRef.current?.abort()}><LoaderCircle className="animate-spin" size={17} /> Batalkan</Button> : null}
     </div>
   </div>;

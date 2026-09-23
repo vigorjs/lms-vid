@@ -11,6 +11,8 @@ export async function submitAttempt(_state, formData) {
     if (!submission) throw new Error("Attempt tidak ditemukan atau akses course telah dicabut.");
     if (submission.status !== "DRAFT") throw new Error("Attempt ini sudah pernah dikirim.");
     if (submission.activeVideo.status !== "READY") throw new Error("Video belum siap untuk dikirim.");
+    const pendingEdit = await db.videoAsset.findFirst({ where: { submissionId: id, kind: "STUDENT_EDIT", status: "PROCESSING" }, select: { id: true } });
+    if (pendingEdit) throw new Error("Tunggu hasil edit selesai diproses sebelum mengirim attempt.");
     await db.submission.update({ where: { id }, data: { status: "SUBMITTED", submittedAt: new Date() } }); revalidatePath(`/courses/${submission.courseId}`); revalidatePath("/dashboard");
     return { ok: true, message: "Attempt berhasil dikirim untuk direview." };
   } catch (error) {

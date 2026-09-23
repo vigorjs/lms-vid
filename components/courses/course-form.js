@@ -28,6 +28,6 @@ export function CourseForm({ course, categories, teachers, students = [], isAdmi
     </div>
     <Field label="Nilai minimal lulus" className="max-w-xs"><input name="passThreshold" type="number" min="1" max="100" className={inputClass} defaultValue={course?.passThreshold || 75} required /></Field>
     {course ? <section className="grid gap-3 border-t border-slate-200 pt-6"><div><h3 className="font-bold text-slate-900">Cover course</h3><p className="text-xs text-slate-500">Atur gambar yang tampil di katalog dan halaman materi.</p></div><CoverEditor courseId={course.id} coverUrl={getCourseCoverUrl(course)} /></section> : null}
-    <SubmitButton className="justify-self-start" pendingLabel={course ? "Menyimpan perubahan…" : "Membuat course…"} disabled={total !== 100 || (assignmentRequired && !selectedStudentIds.length)}>{course ? "Simpan perubahan" : "Buat course"}</SubmitButton>
+    <div className="sticky bottom-0 z-20 -mx-4 border-t border-slate-200 bg-white/95 px-4 py-3 pb-[max(.75rem,env(safe-area-inset-bottom))] backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:p-0"><SubmitButton className="w-full md:w-auto" pendingLabel={course ? "Menyimpan perubahan…" : "Membuat course…"} disabled={total !== 100 || (assignmentRequired && !selectedStudentIds.length)}>{course ? "Simpan perubahan" : "Buat course"}</SubmitButton></div>
   </form>;
 }

@@ -51,7 +51,7 @@ a[href]:focus-visible { outline: 2px solid #06b6d4; outline-offset: 3px; }
 
 .nav-link {
   display: flex;
-  height: 42px;
+  min-height: 44px;
   align-items: center;
   gap: 10px;
   border-radius: 12px;
@@ -76,6 +76,10 @@ a[href]:focus-visible { outline: 2px solid #06b6d4; outline-offset: 3px; }
 @keyframes soft-pulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
 .soft-pulse { animation: soft-pulse 1.5s ease-in-out infinite; }
 
-@media (max-width: 1023px) {
-  .nav-link { flex: 0 0 auto; background: #0f172a; }
+@media (max-width: 767px) {
+  main p.text-sm, main p.text-xs { font-size: 1rem; line-height: 1.6; }
+  main input, main textarea, main select { font-size: 1rem; }
+  main input[type="range"] { min-height: 44px; }
+  main button:not(.video-range) { min-height: 44px; min-width: 44px; }
+  main p a[href], main a[href].text-sm { display: inline-flex; min-height: 44px; align-items: center; font-size: 1rem; }
 }

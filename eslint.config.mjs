@@ -8,6 +8,7 @@ const eslintConfig = defineConfig([
     // Default ignores of eslint-config-next:
     ".next/**",
     "generated/**",
+    "public/ffmpeg/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
