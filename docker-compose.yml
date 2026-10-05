@@ -2,6 +2,7 @@ services:
   postgres:
     image: postgres:17-alpine
     profiles: ["bundled-db"]
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
@@ -17,8 +18,9 @@ services:
       retries: 10
 
   minio:
-    image: quay.io/minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+    image: cgr.dev/chainguard/minio:latest
     command: server /data --console-address ":9001"
+    restart: unless-stopped
     ports:
       - "${MINIO_PUBLIC_PORT:-9000}:9000"
       - "${MINIO_CONSOLE_PUBLIC_PORT:-9001}:9001"
@@ -28,25 +30,33 @@ services:
       MINIO_API_CORS_ALLOW_ORIGIN: ${APP_URL:-http://localhost:3000}
     volumes:
       - minio-data:/data
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
   minio-init:
-    image: quay.io/minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
+    build:
+      context: .
+      dockerfile: infra/worker/Dockerfile
     depends_on:
       minio:
-        condition: service_healthy
+        condition: service_started
     environment:
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
       MINIO_BUCKET: ${MINIO_BUCKET:-lms-videos}
       APP_URL: ${APP_URL:-http://localhost:3000}
-    entrypoint: ["/bin/sh", "/config/init-minio.sh"]
-    volumes:
-      - ./infra/minio/init-minio.sh:/config/init-minio.sh:ro
+    command: ["node", "infra/minio/init-minio.mjs"]
+
+  migrate:
+    profiles: ["bundled-db"]
+    build:
+      context: .
+      dockerfile: infra/worker/Dockerfile
+      target: build
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: ${WORKER_DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/pjokvid}
+      DIRECT_URL: ${WORKER_DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/pjokvid}
+    command: ["npx", "prisma", "migrate", "deploy"]
 
   video-worker:
     build:
