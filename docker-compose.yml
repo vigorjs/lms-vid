@@ -30,6 +30,23 @@ services:
       MINIO_API_CORS_ALLOW_ORIGIN: ${APP_URL:-http://localhost:3000}
     volumes:
       - minio-data:/data
+
+  minio-https:
+    image: caddy:2-alpine
+    profiles: ["vps-https"]
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      MINIO_HTTPS_HOST: ${MINIO_HTTPS_HOST:-minio.129-226-144-109.sslip.io}
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      minio:
+        condition: service_started
   minio-init:
     build:
       context: .
@@ -80,3 +97,5 @@ services:
 volumes:
   postgres-data:
   minio-data:
+  caddy-data:
+  caddy-config:

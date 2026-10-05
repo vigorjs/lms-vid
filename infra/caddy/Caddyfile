@@ -1,0 +1,3 @@
+{$MINIO_HTTPS_HOST} {
+	reverse_proxy minio:9000
+}
