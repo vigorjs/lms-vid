@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { authorize, canManageCourse } from "@/lib/auth/dal";
 import { AppError, errorResponse } from "@/lib/errors";
 import { coverUploadIntentSchema } from "@/lib/validation";
-import { COVER_UPLOAD_URL_EXPIRY_SECONDS } from "@/lib/image/constants";
+import { COVER_OUTPUT_EXTENSIONS, COVER_UPLOAD_URL_EXPIRY_SECONDS } from "@/lib/image/constants";
 import { assertSameOrigin, coverObjectPrefix } from "@/lib/image/server";
 import { createUploadUrl } from "@/lib/storage/minio";
 
@@ -17,7 +17,7 @@ export async function POST(request, { params }) {
     if (!course) throw new AppError("Course tidak ditemukan.", 404, "NOT_FOUND");
     if (!canManageCourse(user, course)) throw new AppError("Tidak boleh mengubah cover course ini.", 403, "FORBIDDEN");
 
-    const objectKey = `${coverObjectPrefix(course.id, user.id)}${randomUUID()}.webp`;
+    const objectKey = `${coverObjectPrefix(course.id, user.id)}${randomUUID()}.${COVER_OUTPUT_EXTENSIONS[input.contentType]}`;
     const uploadUrl = await createUploadUrl(objectKey, COVER_UPLOAD_URL_EXPIRY_SECONDS);
     return Response.json({ data: { objectKey, uploadUrl } });
   } catch (error) {

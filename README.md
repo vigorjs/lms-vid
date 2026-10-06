@@ -101,7 +101,8 @@ Student dapat mendaftar lewat `/register` dengan email dan nama lengkap opsional
 
 ## Kebijakan video
 
-- MP4 dengan codec H.264/AAC
+- Sumber MP4/MOV (termasuk video iPhone); worker mengubah video yang belum kompatibel menjadi MP4 H.264/AAC
+- Hasil encode tetap digunakan walaupun lebih besar dari sumber HEVC. Jika konversi gagal, hanya sumber MP4 yang lolos pemeriksaan codec, resolusi, frame rate, dan fast-start boleh dipakai sebagai fallback; MOV/HEVC tetap berstatus gagal.
 - Maksimum 100 MB dan 10 menit
 - Upload menggunakan part 5 MiB secara berurutan dengan tiga percobaan per part agar lebih tahan terhadap timeout proxy
 - Object disimpan privat di MinIO; database hanya menyimpan metadata/object key
@@ -112,7 +113,7 @@ Student dapat mendaftar lewat `/register` dengan email dan nama lengkap opsional
 ## Kebijakan cover course
 
 - Sumber berupa JPG, PNG, atau WebP maksimal 5 MB dan 20 megapiksel
-- Teacher/admin melakukan crop manual 16:9; browser menghasilkan WebP 1280×720 maksimal 2 MB
+- Teacher/admin melakukan crop manual 16:9; browser menghasilkan WebP 1280×720 maksimal 2 MB, dengan fallback JPEG jika diperlukan oleh browser
 - Upload menggunakan presigned PUT ke `${MINIO_FOLDER}/covers/...`
 - Cover bersifat opsional, dapat diganti/dihapus, dan object lama dibersihkan dari MinIO
 

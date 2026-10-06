@@ -74,7 +74,7 @@ async function processJob(job) {
     try { streams = await probeVideo(source); }
     catch (error) { console.warn(`FFprobe ${job.assetId} gagal; mencoba encode:`, error.message); }
     const compatible = isDirectPlayCompatible(streams);
-    if (compatible && await hasFastStart(source).catch(() => false)) {
+    if (compatible && asset.contentType === "video/mp4" && await hasFastStart(source).catch(() => false)) {
       await finalizeProcessedVideo(db, job.assetId, { objectKey: job.sourceKey, sizeBytes: asset.sizeBytes }, { maxWait: 10_000, timeout: 15_000 });
       await cleanupSource(job.assetId, job.sourceKey, job.sourceKey);
       console.info(`Video ${job.assetId} siap langsung (${asset.sizeBytes} byte; antrean ${startedAt - new Date(job.createdAt).getTime()} ms, unduh ${downloadedAt - startedAt} ms, proses ${Date.now() - downloadedAt} ms).`);
@@ -91,11 +91,6 @@ async function processJob(job) {
       await encode(source, encoded);
       candidate = encoded;
       mode = "encode";
-      if ((await stat(encoded)).size >= asset.sizeBytes) {
-        await runFfmpeg(["-i", source, "-map", "0", "-c", "copy", "-movflags", "+faststart", remuxed]);
-        candidate = remuxed;
-        mode = "remux setelah encode";
-      }
     }
     const outputSize = (await stat(candidate)).size;
     if (!outputSize || outputSize > MAX_VIDEO_BYTES) throw new Error("Hasil video melebihi batas ukuran.");
@@ -153,7 +148,16 @@ async function handleFailure(job, error) {
     return;
   }
 
+  let fallbackDirectory;
   try {
+    const asset = await db.videoAsset.findUnique({ where: { id: job.assetId } });
+    if (asset?.contentType !== "video/mp4") throw new Error("Sumber MOV harus berhasil dikonversi sebelum dapat diputar.");
+    fallbackDirectory = await mkdtemp(path.join(tmpdir(), "lms-video-"));
+    const fallbackFile = path.join(fallbackDirectory, "source.mp4");
+    await pipeline(await minio.getObject(bucket, job.sourceKey), createWriteStream(fallbackFile));
+    if (!isDirectPlayCompatible(await probeVideo(fallbackFile)) || !await hasFastStart(fallbackFile)) {
+      throw new Error("Video sumber belum kompatibel untuk pemutaran langsung.");
+    }
     const source = await minio.statObject(bucket, job.sourceKey);
     await finalizeProcessedVideo(db, job.assetId, {
       objectKey: job.sourceKey,
@@ -169,6 +173,8 @@ async function handleFailure(job, error) {
       db.videoProcessingJob.update({ where: { assetId: job.assetId }, data: { status: "COMPLETE", leaseUntil: null, lastError: message } }),
     ]);
     await minio.removeObject(bucket, job.outputKey).catch((cleanupError) => console.error("Pembersihan hasil gagal:", cleanupError));
+  } finally {
+    if (fallbackDirectory) await rm(fallbackDirectory, { recursive: true, force: true });
   }
 }
 

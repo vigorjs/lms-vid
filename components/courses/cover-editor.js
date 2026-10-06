@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import {
   COVER_ASPECT,
   COVER_HEIGHT,
-  COVER_QUALITY,
+  COVER_OUTPUT_EXTENSIONS,
   COVER_SOURCE_TYPES,
   COVER_WIDTH,
   MAX_COVER_OUTPUT_BYTES,
@@ -18,6 +18,7 @@ import {
   MAX_COVER_SOURCE_PIXELS,
 } from "@/lib/image/constants";
 import { formatBytes } from "@/lib/utils";
+import { encodeCover } from "@/lib/image/encode-cover";
 
 function loadImage(url) {
   return new Promise((resolve, reject) => {
@@ -42,14 +43,6 @@ async function inspectCover(file) {
   }
 }
 
-async function canvasToWebp(canvas) {
-  for (const quality of [COVER_QUALITY, 0.72, 0.62]) {
-    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", quality));
-    if (blob?.type === "image/webp" && blob.size <= MAX_COVER_OUTPUT_BYTES) return blob;
-  }
-  throw new Error("Hasil crop terlalu besar. Gunakan gambar yang lebih sederhana.");
-}
-
 export async function createCroppedCover(imageUrl, area) {
   if (!area?.width || !area?.height) throw new Error("Area crop belum siap.");
   const image = await loadImage(imageUrl);
@@ -59,7 +52,7 @@ export async function createCroppedCover(imageUrl, area) {
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Browser tidak mendukung pemrosesan gambar.");
   context.drawImage(image, area.x, area.y, area.width, area.height, 0, 0, COVER_WIDTH, COVER_HEIGHT);
-  return canvasToWebp(canvas);
+  return encodeCover(canvas);
 }
 
 function uploadBlob(url, blob, { signal, onProgress }) {
@@ -71,7 +64,7 @@ function uploadBlob(url, blob, { signal, onProgress }) {
       callback();
     };
     xhr.open("PUT", url);
-    xhr.setRequestHeader("Content-Type", "image/webp");
+    xhr.setRequestHeader("Content-Type", blob.type);
     xhr.upload.onprogress = (event) => event.lengthComputable && onProgress?.(Math.round(event.loaded / event.total * 100));
     xhr.onload = () => finish(() => xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload cover gagal (${xhr.status}).`)));
     xhr.onerror = () => finish(() => reject(new Error("Tidak dapat mengupload cover ke MinIO.")));
@@ -147,7 +140,7 @@ export function CoverEditor({ courseId, coverUrl }) {
       const intentResponse = await fetch(`/api/courses/${courseId}/cover/upload-intent`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fileName: "cover.webp", contentType: "image/webp", sizeBytes: blob.size }),
+        body: JSON.stringify({ fileName: `cover.${COVER_OUTPUT_EXTENSIONS[blob.type]}`, contentType: blob.type, sizeBytes: blob.size }),
         signal: controller.signal,
       });
       const intent = await responsePayload(intentResponse, "Gagal membuat upload cover.");
@@ -201,6 +194,6 @@ export function CoverEditor({ courseId, coverUrl }) {
       <p className="text-xs leading-5 text-slate-500">JPG, PNG, atau WebP · Maks. 5 MB · Hasil crop 16:9</p>
       <div className="flex flex-wrap gap-2"><Button type="button" onClick={() => inputRef.current?.click()} disabled={Boolean(pendingAction)}><ImageIcon size={17} /> {coverUrl ? "Ganti cover" : "Pilih gambar"}</Button>{coverUrl ? <Button type="button" variant="danger" onClick={remove} disabled={Boolean(pendingAction)}>{pendingAction === "delete" ? <LoaderCircle className="animate-spin" size={17} /> : <Trash2 size={17} />} {pendingAction === "delete" ? "Menghapus…" : "Hapus cover"}</Button> : null}</div>
     </>}
-    {sourceUrl ? <p className="text-xs text-slate-500">Output: {COVER_WIDTH}×{COVER_HEIGHT} WebP, maksimal {formatBytes(MAX_COVER_OUTPUT_BYTES)}.</p> : null}
+    {sourceUrl ? <p className="text-xs text-slate-500">Output: {COVER_WIDTH}×{COVER_HEIGHT} WebP/JPEG, maksimal {formatBytes(MAX_COVER_OUTPUT_BYTES)}.</p> : null}
   </div>;
 }

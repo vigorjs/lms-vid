@@ -8,14 +8,35 @@ import { formatBytes, formatDuration } from "@/lib/utils";
 import { MAX_VIDEO_BYTES, MAX_VIDEO_DURATION_SECONDS } from "@/lib/video/constants";
 import { calculateMultipartProgress, createMultipartPlan, retryMultipartPart } from "@/lib/video/multipart";
 import { VideoProcessingStatus } from "./processing-status";
+import { videoSourceType } from "@/lib/video/source";
 
 export async function inspectVideo(file) {
-  if (file.type !== "video/mp4" && !file.name.toLowerCase().endsWith(".mp4")) throw new Error("Gunakan file MP4 dengan codec H.264/AAC.");
+  videoSourceType(file);
   if (file.size > MAX_VIDEO_BYTES) throw new Error("Ukuran video maksimum 100 MB.");
-  const url = URL.createObjectURL(file); const video = document.createElement("video"); video.preload = "metadata"; video.src = url;
-  const duration = await new Promise((resolve, reject) => { video.onloadedmetadata = () => resolve(video.duration); video.onerror = () => reject(new Error("Video tidak dapat diputar. Pastikan codec H.264/AAC.")); });
-  URL.revokeObjectURL(url); if (!Number.isFinite(duration) || duration <= 0 || duration > MAX_VIDEO_DURATION_SECONDS) throw new Error("Durasi video harus antara 1 detik dan 10 menit.");
-  return duration;
+  const url = URL.createObjectURL(file);
+  const video = document.createElement("video");
+  let timer;
+  try {
+    const duration = await new Promise((resolve, reject) => {
+      video.onloadedmetadata = () => resolve(video.duration);
+      video.onerror = () => reject(new Error("Durasi video tidak dapat dibaca. Coba ekspor sebagai MP4 H.264 lalu unggah kembali."));
+      timer = setTimeout(() => reject(new Error("Pembacaan video terlalu lama. Pastikan video sudah diunduh dari iCloud lalu coba lagi.")), 30_000);
+      video.preload = "metadata";
+      video.muted = true;
+      video.playsInline = true;
+      video.src = url;
+      video.load();
+    });
+    if (!Number.isFinite(duration) || duration <= 0 || duration > MAX_VIDEO_DURATION_SECONDS) throw new Error("Durasi video harus antara 1 detik dan 10 menit.");
+    return duration;
+  } finally {
+    clearTimeout(timer);
+    video.onloadedmetadata = null;
+    video.onerror = null;
+    video.removeAttribute("src");
+    video.load();
+    URL.revokeObjectURL(url);
+  }
 }
 
 export function uploadPart(url, blob, { onProgress, signal } = {}) {
@@ -50,10 +71,11 @@ async function abortVideoAsset(assetId) {
 export async function uploadVideoAsset({ courseId, purpose, file, durationSeconds, parentAssetId, submissionId, trimStartSeconds, trimEndSeconds, editSpec, onProgress, signal }) {
   let assetId;
   try {
+    const contentType = videoSourceType(file);
     const intentResponse = await fetch("/api/videos/upload-intent", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ courseId, purpose, fileName: file.name, contentType: "video/mp4", sizeBytes: file.size, durationSeconds, parentAssetId, submissionId, trimStartSeconds, trimEndSeconds, editSpec }),
+      body: JSON.stringify({ courseId, purpose, fileName: file.name, contentType, sizeBytes: file.size, durationSeconds, parentAssetId, submissionId, trimStartSeconds, trimEndSeconds, editSpec }),
       signal,
     });
     const intent = await intentResponse.json();
@@ -70,7 +92,7 @@ export async function uploadVideoAsset({ courseId, purpose, file, durationSecond
     for (const part of plan) {
       const target = intent.data.parts.find((candidate) => candidate.partNumber === part.partNumber);
       if (!target?.url) throw new Error(`URL upload part ${part.partNumber} tidak tersedia.`);
-      const blob = file.slice(part.start, part.end, "video/mp4");
+      const blob = file.slice(part.start, part.end, contentType);
 
       await retryMultipartPart(
         () => uploadPart(target.url, blob, {
@@ -161,15 +183,15 @@ export function VideoUploader({ courseId, purpose, compact = false, disabled = f
   }
 
   return <div className={compact ? "grid gap-3" : "rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-6 text-center"}>
-    <input ref={inputRef} className="hidden" type="file" accept="video/mp4,.mp4" onChange={choose} />
+    <input ref={inputRef} className="hidden" type="file" accept="video/mp4,video/quicktime,video/x-m4v,.mp4,.mov,.m4v" onChange={choose} />
     {file ? <div className="mb-3 flex items-center gap-3 rounded-xl bg-white p-3 text-left">
       <span className="grid size-10 place-items-center rounded-lg bg-cyan-50 text-cyan-700"><FileVideo size={20} /></span>
       <div className="min-w-0 flex-1"><strong className="block truncate text-sm">{file.name}</strong><span className="text-xs text-slate-500">{formatBytes(file.size)} · {formatDuration(duration)}</span></div>
       <CheckCircle2 className="text-emerald-500" size={20} />
     </div> : !compact ? <>
       <UploadCloud className="mx-auto text-slate-400" size={36} />
-      <h3 className="mt-3 font-bold">Upload video MP4</h3>
-      <p className="mt-1 text-xs text-slate-500">H.264/AAC · Maks. 100 MB · 10 menit</p>
+      <h3 className="mt-3 font-bold">Upload video MP4 atau MOV</h3>
+      <p className="mt-1 text-xs text-slate-500">Termasuk video iPhone · Maks. 100 MB · 10 menit</p>
     </> : null}
     {processingId ? <VideoProcessingStatus assetId={processingId} /> : null}
     {pending ? <div className="mb-3">

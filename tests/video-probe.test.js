@@ -29,6 +29,8 @@ it("skips encoding only for browser-compatible videos within 720p and 30 fps", (
   const audio = { codec_type: "audio", codec_name: "aac" };
   expect(isDirectPlayCompatible([video, audio])).toBe(true);
   expect(isDirectPlayCompatible([video])).toBe(true);
+  expect(isDirectPlayCompatible([{ ...video, codec_name: "hevc" }, audio])).toBe(false);
+  expect(isDirectPlayCompatible([{ ...video, pix_fmt: "yuv420p10le" }, audio])).toBe(false);
   expect(isDirectPlayCompatible([{ ...video, width: 1920 }, audio])).toBe(false);
   expect(isDirectPlayCompatible([{ ...video, r_frame_rate: "60/1" }, audio])).toBe(false);
   expect(isDirectPlayCompatible([video, { ...audio, codec_name: "opus" }])).toBe(false);

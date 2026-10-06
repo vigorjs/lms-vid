@@ -108,9 +108,9 @@ export async function POST(request) {
       kind === "REFERENCE" ? "references" : "submissions",
       course.id,
       user.id,
-      `${randomUUID()}.mp4`,
+      `${randomUUID()}.${input.contentType === "video/quicktime" ? "mov" : "mp4"}`,
     );
-    uploadId = await initiateMultipartUpload(objectKey);
+    uploadId = await initiateMultipartUpload(objectKey, input.contentType);
 
     const singleSegment = editSpec?.segments.length === 1 ? editSpec.segments[0] : null;
     const asset = await createAsset({
@@ -125,7 +125,7 @@ export async function POST(request) {
         contentType: input.contentType,
         sizeBytes: input.sizeBytes,
         durationSeconds: input.durationSeconds,
-        codec: "H.264/AAC",
+        codec: null,
         trimStartSeconds: singleSegment?.startSeconds,
         trimEndSeconds: singleSegment?.endSeconds,
         ...(editSpec ? { editSpec } : {}),

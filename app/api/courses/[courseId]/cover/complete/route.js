@@ -5,7 +5,7 @@ import { AppError, errorResponse } from "@/lib/errors";
 import { coverCompleteSchema } from "@/lib/validation";
 import { MAX_COVER_OUTPUT_BYTES } from "@/lib/image/constants";
 import { assertCoverObjectKey, assertSameOrigin } from "@/lib/image/server";
-import { hasWebpSignature } from "@/lib/image/validation";
+import { hasCoverSignature } from "@/lib/image/validation";
 import { readStorageObjectRange, removeStorageObject } from "@/lib/storage/minio";
 
 function revalidateCourse(courseId) {
@@ -41,7 +41,7 @@ export async function POST(request, { params }) {
     }
     if (!object) throw new AppError("File cover tidak ditemukan di storage.", 404, "OBJECT_NOT_FOUND");
     if (Number(object.size) <= 0 || Number(object.size) > MAX_COVER_OUTPUT_BYTES) throw new AppError("Ukuran cover tidak valid.", 400, "INVALID_COVER_SIZE");
-    if (!hasWebpSignature(object.buffer)) throw new AppError("File cover bukan WebP yang valid.", 400, "INVALID_COVER_FILE");
+    if (!hasCoverSignature(object.buffer, input.objectKey)) throw new AppError("Format file cover tidak sesuai atau tidak valid.", 400, "INVALID_COVER_FILE");
 
     await db.course.update({ where: { id: course.id }, data: { coverImageKey: input.objectKey, coverUpdatedAt: new Date() } });
     if (course.coverImageKey && course.coverImageKey !== input.objectKey) {
