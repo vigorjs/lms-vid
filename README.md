@@ -1,4 +1,4 @@
-# GerakBelajar
+# Belajar Gerak
 
 LMS video untuk pembelajaran gerakan olahraga. Student dapat membandingkan video mereka dengan video demonstrasi teacher secara sinkron, melakukan trim di browser, mengirim attempt, lalu menerima rubric, nilai, dan feedback bertimestamp.
 

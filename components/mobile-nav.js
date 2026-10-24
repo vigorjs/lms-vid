@@ -34,7 +34,7 @@ export function MobileNav({ links }) {
     {open ? <>
       <button type="button" aria-label="Tutup menu navigasi" className="fixed inset-0 z-40 bg-slate-950/60" onClick={closeMenu} />
       <nav ref={panelRef} id="mobile-navigation" role="dialog" aria-modal="true" aria-label="Navigasi utama" className="fixed inset-x-0 top-0 z-50 max-h-dvh overflow-y-auto bg-slate-950 p-4 pb-8 shadow-2xl">
-        <div className="mb-4 flex items-center justify-between text-base font-bold text-white"><span>Menu GerakBelajar</span><button type="button" aria-label="Tutup menu" onClick={closeMenu} className="grid size-11 place-items-center rounded-xl bg-slate-800 focus-visible:ring-2 focus-visible:ring-cyan-400"><X size={22}/></button></div>
+        <div className="mb-4 flex items-center justify-between text-base font-bold text-white"><span>Menu Belajar Gerak</span><button type="button" aria-label="Tutup menu" onClick={closeMenu} className="grid size-11 place-items-center rounded-xl bg-slate-800 focus-visible:ring-2 focus-visible:ring-cyan-400"><X size={22}/></button></div>
         <div className="grid gap-2">{links.map(([href, label]) => <Link key={href} href={href} onClick={() => setOpen(false)} className="flex min-h-11 items-center gap-3 rounded-xl bg-slate-900 px-4 text-base font-semibold text-white focus-visible:ring-2 focus-visible:ring-cyan-400">{label}</Link>)}<Link href="/profile" onClick={() => setOpen(false)} className="flex min-h-11 items-center gap-3 rounded-xl bg-slate-900 px-4 text-base font-semibold text-white focus-visible:ring-2 focus-visible:ring-cyan-400"><UserCircle size={20}/> Profil</Link></div>
       </nav>
     </> : null}
